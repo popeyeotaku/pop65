@@ -95,6 +95,19 @@ impl Line {
             line_num,
         }
     }
+
+    /// Return the position of the source line.
+    ///
+    /// A line with path "foo" and line_num 11 will pos() as
+    /// "foo:11"
+    pub fn pos(&self) -> String {
+        format!("{}:{}", self.path, self.line_num)
+    }
+
+    /// Construct an error message at this line's pos() as a header.
+    pub fn err<T>(&self, msg: &str) -> Result<T, String> {
+        Err(format!("{}:{}", self.pos(), msg))
+    }
 }
 
 /// A slice within a given line.
@@ -127,6 +140,19 @@ impl LineSlice {
             start_index: start as u16,
             end_index: end as u16,
         }
+    }
+
+    /// Return a string representing the position in the line.
+    ///
+    /// A line with path "foo", line_num 11, start_char 3 will pos() as
+    /// "foo:11:3".
+    pub fn pos(&self) -> String {
+        format!("{}:{}:{}", self.path(), self.line_num(), self.start_char)
+    }
+
+    /// Construct an error message using this slice's pos() as a header.
+    pub fn err<T>(&self, msg: &str) -> Result<T, String> {
+        Err(format!("{}:{}", self.pos(), msg))
     }
 
     /// Return the underlying path.
@@ -203,5 +229,13 @@ mod tests {
         assert_eq!(none.text(), "");
         assert_eq!(all.text(), "foobar");
         assert_eq!(end.text(), "");
+    }
+
+    #[test]
+    fn test_pos() {
+        let foo = Line::new("foobar", "foo", 11);
+        let bar = LineSlice::new(&foo, 3, 6);
+        assert_eq!(&foo.pos(), "foo:11");
+        assert_eq!(&bar.pos(), "foo:11:3");
     }
 }

@@ -16,7 +16,9 @@ pub fn assemble(src: Source) -> Vec<u8> {
     asm.pass2()
 }
 
+mod action;
 mod asm;
+mod parse;
 mod source;
 mod symbol;
 

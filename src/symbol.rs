@@ -2,8 +2,11 @@
 
 use crate::source::LineSlice;
 
+/// An entry in the symbol table.
 pub struct Symbol {
     name: String,
-    value: u16,
+    value: Option<u16>,
+    defined: Option<LineSlice>,
+    references: Vec<LineSlice>,
     source: Option<LineSlice>,
 }
