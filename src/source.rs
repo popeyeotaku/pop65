@@ -80,7 +80,7 @@ impl Iterator for SrcStack {
 }
 
 /// A single line of input.
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone, Eq, Hash)]
 pub struct Line {
     pub text: String,
     pub path: String,
@@ -94,6 +94,11 @@ impl Line {
             path: path.to_string(),
             line_num,
         }
+    }
+
+    /// Return a LineSlice into this line.
+    pub fn slice(&self, start_char: u16, end_char: u16) -> LineSlice {
+        LineSlice::new(self, start_char, end_char)
     }
 
     /// Return the position of the source line.
@@ -111,6 +116,7 @@ impl Line {
 }
 
 /// A slice within a given line.
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct LineSlice {
     line: Line,
     pub start_char: u16,
