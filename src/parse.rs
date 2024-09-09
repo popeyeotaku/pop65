@@ -55,11 +55,18 @@ impl Assembler {
         let label = self.parse_label(&mut chars)?.map(Box::new);
         let action = self.parse_action(&mut chars)?;
         let comment = self.parse_comment(&mut chars)?.map(Box::new);
-        Ok(ParsedLine {
-            label,
-            action,
-            comment,
-        })
+
+        self.skip_ws(&mut chars);
+        if let Some((_, pos)) = chars.next() {
+            pos.err("unexpected characters past end of line")
+        } else {
+            Ok(ParsedLine {
+                label,
+                action,
+                comment,
+            })
+        }
+
     }
 
     /// Skip leading whitespace.
@@ -106,6 +113,8 @@ impl Assembler {
         &mut self,
         chars: &mut Peekable<LineChars>,
     ) -> Result<Option<Box<dyn Action>>, String> {
+        self.skip_ws(chars);
+        
         todo!()
     }
 
@@ -114,7 +123,20 @@ impl Assembler {
         &mut self,
         chars: &mut Peekable<LineChars>,
     ) -> Result<Option<LineSlice>, String> {
-        todo!()
+        self.skip_ws(chars);
+        if let Some((c, start)) = chars.peek().cloned() {
+            if c == ';' {
+                if let Some((_, end)) = chars.last() {
+                    Ok(Some(start.join(&end)))
+                } else {
+                    Ok(Some(start))
+                }
+            } else {
+                Ok(None)
+            }
+        } else {
+            Ok(None)
+        }
     }
 }
 
