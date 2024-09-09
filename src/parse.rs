@@ -6,7 +6,7 @@ use std::{
 };
 
 use crate::{
-    action::Action,
+    action::{Action, PseudoOp},
     asm::Assembler,
     source::{Line, LineSlice},
 };
@@ -66,7 +66,6 @@ impl Assembler {
                 comment,
             })
         }
-
     }
 
     /// Skip leading whitespace.
@@ -74,6 +73,8 @@ impl Assembler {
         while let Some((c, _)) = chars.peek() {
             if !c.is_ascii_whitespace() {
                 break;
+            } else {
+                chars.next();
             }
         }
     }
@@ -114,7 +115,68 @@ impl Assembler {
         chars: &mut Peekable<LineChars>,
     ) -> Result<Option<Box<dyn Action>>, String> {
         self.skip_ws(chars);
-        
+
+        if let Some((c, start)) = chars.peek().cloned() {
+            if c == '.' {
+                chars.next();
+                return self.parse_pseudo(start, chars).map(Some);
+            }
+        }
+
+        if let Some(name) = self.parse_name(chars) {
+            self.parse_opcode(name, chars).map(Some)
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Return a flag if we're at end-of-line.
+    /// (skips whitespace and also exits on a comment).
+    fn at_eol(&mut self, chars: &mut Peekable<LineChars>) -> bool {
+        self.skip_ws(chars);
+        if let Some((c, _)) = chars.next() {
+            if c == ';' {
+                true
+            } else {
+                false
+            }
+        } else {
+            true
+        }
+    }
+
+    /// Parse a psuedo-op.
+    fn parse_pseudo(
+        &mut self,
+        start: LineSlice,
+        chars: &mut Peekable<LineChars>,
+    ) -> Result<Box<dyn Action>, String> {
+        if let Some(name) = self.parse_name(chars) {
+            let name = start.join(&name);
+            if self.at_eol(chars) {
+                Ok(Box::new(PseudoOp::new(name, Vec::new())))
+            } else {
+                let mut args = vec![self.parse_expr(chars)?];
+                while let Some((c, _)) = chars.next() {
+                    if c == ',' {
+                        args.push(self.parse_expr(chars)?);
+                    } else {
+                        break;
+                    }
+                }
+                Ok(Box::new(PseudoOp::new(name, args)))
+            }
+        } else {
+            start.err("missing pseudo-op name")
+        }
+    }
+
+    /// Parse an opcode.
+    fn parse_opcode(
+        &mut self,
+        opcode: LineSlice,
+        chars: &mut Peekable<LineChars>,
+    ) -> Result<Box<dyn Action>, String> {
         todo!()
     }
 
@@ -139,6 +201,8 @@ impl Assembler {
         }
     }
 }
+
+mod expr;
 
 #[cfg(test)]
 mod tests {

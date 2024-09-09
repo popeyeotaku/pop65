@@ -21,7 +21,7 @@ pub struct Assembler {
     pass: Pass,
     symtab: HashMap<String, Box<Symbol>>,
     program_counter: Option<u16>,
-    cur_line: Option<Line>,
+    pub cur_line: Option<Line>,
 }
 
 impl Assembler {
