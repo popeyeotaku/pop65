@@ -3,6 +3,7 @@
 use std::collections::HashMap;
 
 use crate::{
+    parse::ParsedLine,
     source::{Line, LineSlice, Source, SrcStack},
     symbol::Symbol,
 };
@@ -16,7 +17,7 @@ pub enum Pass {
 
 pub struct Assembler {
     pass1_src: Box<SrcStack>,
-    pass2_src: Vec<Line>,
+    pass2_src: Vec<ParsedLine>,
     pass: Pass,
     symtab: HashMap<String, Box<Symbol>>,
     program_counter: Option<u16>,
@@ -44,25 +45,30 @@ impl Assembler {
 
         while let Some(line) = self.pass1_src.next() {
             self.cur_line = Some(line.clone());
-            self.pass2_src.push(line.clone());
-            let (label, action, _) = self.parse_line(&line)?;
-            if let Some(label_slice) = &label {
+            let parsed = self.parse_line(&line)?;
+            if let Some(label_slice) = &parsed.label {
                 self.def_label(label_slice.text(), label_slice)?;
             }
-            if let Some(action) = action {
-                let size = action.pass1(self, &label)?;
+            if let Some(action) = &parsed.action {
+                let size = action.pass1(self, &parsed.label)?;
                 self.pc_add(size)?;
             }
+            self.pass2_src.push(parsed);
         }
         Ok(())
     }
 
     /// Final assembly.
-    pub fn pass2(&mut self) -> Vec<u8> {
+    pub fn pass2(&mut self) -> Result<Vec<u8>, String> {
         self.program_counter = None;
         self.pass = Pass::Pass2;
+        let mut output: Vec<u8> = Vec::with_capacity((u16::MAX as usize) + 1);
 
-        todo!()
+        for parsed_line in &self.pass2_src {
+            todo!()
+        }
+
+        Ok(output)
     }
 
     /// Add a value to the current PC.
@@ -132,7 +138,7 @@ impl Assembler {
 
 #[cfg(test)]
 mod tests {
-    use crate::source::{self, LineSlice};
+    use crate::source::{self};
 
     use super::{Assembler, Pass};
 
