@@ -80,7 +80,7 @@ impl Iterator for SrcStack {
 }
 
 /// A single line of input.
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct Line {
     pub text: String,
     pub path: String,
@@ -97,9 +97,64 @@ impl Line {
     }
 }
 
+/// A slice within a given line.
+pub struct LineSlice {
+    line: Line,
+    pub start_char: u16,
+    pub end_char: u16,
+    start_index: u16,
+    end_index: u16,
+}
+
+impl LineSlice {
+    pub fn new(line: &Line, start_char: u16, end_char: u16) -> Self {
+        let line = line.clone();
+        let (start, _) = line
+            .text
+            .char_indices()
+            .nth(start_char as usize)
+            .unwrap_or((line.text.len(), ' '));
+        let (end, _) = line
+            .text
+            .char_indices()
+            .nth(end_char as usize)
+            .unwrap_or((line.text.len(), ' '));
+
+        Self {
+            line,
+            start_char,
+            end_char,
+            start_index: start as u16,
+            end_index: end as u16,
+        }
+    }
+
+    /// Return the underlying path.
+    pub fn path(&self) -> &str {
+        &self.line.path
+    }
+
+    /// Return the underlying line number.
+    pub fn line_num(&self) -> LineNum {
+        self.line.line_num
+    }
+
+    /// Return the underlying text of the complete line.
+    pub fn line_text(&self) -> &str {
+        &self.line.text
+    }
+
+    /// Return the text of this slice.
+    pub fn text(&self) -> &str {
+        let start = self.start_index as usize;
+        let end = self.end_index as usize;
+        &self.line_text()[start..end]
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{from_str, Line, SrcStack};
+    use super::{from_str, Line, LineSlice, SrcStack};
 
     #[test]
     fn test_strsrc() {
@@ -130,5 +185,23 @@ mod tests {
                 Line::new("foobar", "foobar", 3)
             ]
         );
+    }
+
+    #[test]
+    fn test_line_slice() {
+        let foobar = Line::new("foobar", "foobar", 1);
+        let foo = LineSlice::new(&foobar, 0, 3);
+        let bar = LineSlice::new(&foobar, 3, 6);
+        let f = LineSlice::new(&foobar, 0, 1);
+        let none = LineSlice::new(&foobar, 3, 3);
+        let all = LineSlice::new(&foobar, 0, 6);
+        let end = LineSlice::new(&foobar, 6, 6);
+
+        assert_eq!(foo.text(), "foo");
+        assert_eq!(bar.text(), "bar");
+        assert_eq!(f.text(), "f");
+        assert_eq!(none.text(), "");
+        assert_eq!(all.text(), "foobar");
+        assert_eq!(end.text(), "");
     }
 }

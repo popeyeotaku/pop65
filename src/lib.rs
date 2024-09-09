@@ -1,5 +1,6 @@
 //! Pop65: a simple 6502 assembler.
 
+use asm::Assembler;
 use source::Source;
 
 /// Assemble code from a source string.
@@ -10,10 +11,14 @@ pub fn assemble_str(src: &str, path: &str) -> Vec<u8> {
 
 /// Assemble a source file.
 pub fn assemble(src: Source) -> Vec<u8> {
-    todo!()
+    let mut asm = Assembler::new(src);
+    asm.pass1();
+    asm.pass2()
 }
 
+mod asm;
 mod source;
+mod symbol;
 
 #[cfg(test)]
 mod tests {
