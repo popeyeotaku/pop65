@@ -98,7 +98,9 @@ impl Assembler {
                 .insert(name.to_string(), Symbol::new(name, ref_slice));
             debug_assert!(already_there.is_none());
         }
-        self.symtab.get_mut(name).unwrap()
+        let sym = self.symtab.get_mut(name).unwrap();
+        sym.add_ref(ref_slice);
+        sym
     }
 
     /// Define a new symbol, complaining if it was redefined.

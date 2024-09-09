@@ -125,6 +125,8 @@ impl Assembler {
                 self.parse_num(16, chars)
             } else if c.is_ascii_alphabetic() {
                 let name = self.parse_name(chars).unwrap();
+                // Ensure this reference to the symbol is noticed
+                self.lookup(name.text(), &name);
                 Ok(ExprNode::new(ExLab::Name, name))
             } else if c == '\'' || c == '"' {
                 self.parse_str(chars)
