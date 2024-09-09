@@ -1,5 +1,7 @@
 //! Source file handling.
 
+use std::cmp::{max, min};
+
 /// Used to specify a line number.
 pub type LineNum = u32;
 
@@ -116,7 +118,7 @@ impl Line {
 }
 
 /// A slice within a given line.
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct LineSlice {
     line: Line,
     pub start_char: u16,
@@ -146,6 +148,22 @@ impl LineSlice {
             start_index: start as u16,
             end_index: end as u16,
         }
+    }
+
+    /// Construct a new line_slice with another; the lowest starting and highest ending positions
+    /// are used.
+    pub fn join(&self, other: &LineSlice) -> Self {
+        assert_eq!(&self.line, &other.line);
+        Self::new(
+            &self.line,
+            min(self.start_char, other.start_char),
+            max(self.end_char, other.end_char),
+        )
+    }
+
+    /// Return a cloned LineSlice, but with a new ending position.
+    pub fn with_end(&self, end_char: u16) -> Self {
+        Self::new(&self.line, self.start_char, end_char)
     }
 
     /// Return a string representing the position in the line.
