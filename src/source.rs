@@ -42,6 +42,43 @@ impl Iterator for StrSrc {
     }
 }
 
+/// A stack of inputs: used as the main input for assemble().
+pub struct SrcStack {
+    sources: Vec<Source>,
+}
+
+impl SrcStack {
+    pub fn new(starting_src: Source) -> Self {
+        Self {
+            sources: vec![starting_src],
+        }
+    }
+
+    /// Remove the last source.
+    pub fn push(&mut self, src: Source) {
+        self.sources.push(src);
+    }
+}
+
+impl Iterator for SrcStack {
+    type Item = Line;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            if let Some(src) = self.sources.last_mut() {
+                if let Some(line) = src.next() {
+                    return Some(line);
+                } else {
+                    let popped = self.sources.pop();
+                    debug_assert!(popped.is_some());
+                }
+            } else {
+                return None;
+            }
+        }
+    }
+}
+
 /// A single line of input.
 #[derive(PartialEq, Debug)]
 pub struct Line {
@@ -62,7 +99,7 @@ impl Line {
 
 #[cfg(test)]
 mod tests {
-    use super::{from_str, Line};
+    use super::{from_str, Line, SrcStack};
 
     #[test]
     fn test_strsrc() {
@@ -74,5 +111,24 @@ mod tests {
             Line::new("foobar", "foobar", 3),
         ];
         assert_eq!(Vec::from_iter(src), cmp);
+    }
+
+    #[test]
+    fn test_srcstk() {
+        let foobar = "foo\nbar\nfoobar\n";
+        let barfoo = "barfoo\nbar\nfoo\n";
+        let mut stk = SrcStack::new(from_str(foobar, "foobar"));
+        assert_eq!(stk.next(), Some(Line::new("foo", "foobar", 1)));
+        stk.push(from_str(barfoo, "barfoo"));
+        assert_eq!(
+            Vec::from_iter(stk),
+            vec![
+                Line::new("barfoo", "barfoo", 1),
+                Line::new("bar", "barfoo", 2),
+                Line::new("foo", "barfoo", 3),
+                Line::new("bar", "foobar", 2),
+                Line::new("foobar", "foobar", 3)
+            ]
+        );
     }
 }
