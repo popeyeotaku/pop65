@@ -10,6 +10,9 @@ pub trait Action {
         label: &Option<Box<LineSlice>>,
     ) -> Result<u16, String>;
 
+    /// Handle pass-2 parsing. Return the bytes to be sent to the output.
+    fn pass2(&self, assembler: &mut Assembler) -> Result<Vec<u8>, String>;
+
     /// Return the underlying LineSlice for this entire action.
     fn line_slice(&self) -> &LineSlice;
 }

@@ -1,6 +1,6 @@
 //! Assembler struct stuff.
 
-use std::collections::HashMap;
+use std::{collections::HashMap, mem};
 
 use crate::{
     parse::ParsedLine,
@@ -16,8 +16,8 @@ pub enum Pass {
 }
 
 pub struct Assembler {
-    pass1_src: Box<SrcStack>,
-    pass2_src: Vec<ParsedLine>,
+    src_stk: Box<SrcStack>,
+    parsed_lines: Vec<ParsedLine>,
     pass: Pass,
     symtab: HashMap<String, Box<Symbol>>,
     program_counter: Option<u16>,
@@ -27,10 +27,10 @@ pub struct Assembler {
 impl Assembler {
     pub fn new(src: Source) -> Self {
         Self {
-            pass1_src: Box::new(SrcStack::new(src)),
+            src_stk: Box::new(SrcStack::new(src)),
             symtab: HashMap::new(),
             program_counter: None,
-            pass2_src: Vec::new(),
+            parsed_lines: Vec::new(),
             pass: Pass::None,
             cur_line: None,
         }
@@ -39,11 +39,11 @@ impl Assembler {
     /// Read the entire source, constructing the symbol table.
     pub fn pass1(&mut self) -> Result<(), String> {
         self.pass = Pass::Pass1;
-        self.pass2_src.clear();
+        self.parsed_lines.clear();
         self.symtab.clear();
         self.program_counter = None;
 
-        while let Some(line) = self.pass1_src.next() {
+        while let Some(line) = self.src_stk.next() {
             self.cur_line = Some(line.clone());
             let parsed = self.parse_line(&line)?;
             if let Some(label_slice) = &parsed.label {
@@ -53,7 +53,7 @@ impl Assembler {
                 let size = action.pass1(self, &parsed.label)?;
                 self.pc_add(size)?;
             }
-            self.pass2_src.push(parsed);
+            self.parsed_lines.push(parsed);
         }
         Ok(())
     }
@@ -63,9 +63,12 @@ impl Assembler {
         self.program_counter = None;
         self.pass = Pass::Pass2;
         let mut output: Vec<u8> = Vec::with_capacity((u16::MAX as usize) + 1);
+        let lines = mem::take(&mut self.parsed_lines);
 
-        for parsed_line in &self.pass2_src {
-            todo!()
+        for parsed_line in &lines {
+            if let Some(action) = &parsed_line.action {
+                output.extend(action.pass2(self)?);
+            }
         }
 
         Ok(output)
