@@ -17,6 +17,7 @@ impl Assembler {
 
     /// Parse a >/< expression.
     fn parse_hilo(&mut self, chars: &mut Peekable<LineChars>) -> Result<Box<ExprNode>, String> {
+        self.skip_ws(chars);
         if let Some((c, start)) = chars.peek().cloned() {
             match c {
                 '<' => {
@@ -40,7 +41,8 @@ impl Assembler {
     /// Parse a '+'/'-' expression.
     fn parse_addsub(&mut self, chars: &mut Peekable<LineChars>) -> Result<Box<ExprNode>, String> {
         let mut e = self.parse_muldiv(chars)?;
-
+        
+        self.skip_ws(chars);
         while let Some((c, _)) = chars.peek() {
             match c {
                 '+' => {
@@ -48,12 +50,14 @@ impl Assembler {
                     let right = self.parse_muldiv(chars)?;
                     let slice = e.slice.join(&right.slice);
                     e = ExprNode::new(ExLab::Add(e, right), slice);
+                    self.skip_ws(chars);
                 }
                 '-' => {
                     chars.next();
                     let right = self.parse_muldiv(chars)?;
                     let slice = e.slice.join(&right.slice);
                     e = ExprNode::new(ExLab::Sub(e, right), slice);
+                    self.skip_ws(chars);
                 }
                 _ => break,
             }
@@ -64,25 +68,29 @@ impl Assembler {
     /// Parse a '*'/'/'/'%' expression.
     fn parse_muldiv(&mut self, chars: &mut Peekable<LineChars>) -> Result<Box<ExprNode>, String> {
         let mut e = self.parse_unary(chars)?;
-        while let Some((c, _)) = chars.next() {
+        self.skip_ws(chars);
+        while let Some((c, _)) = chars.peek() {
             match c {
                 '*' => {
                     chars.next();
                     let right = self.parse_unary(chars)?;
                     let slice = e.slice.join(&right.slice);
                     e = ExprNode::new(ExLab::Mul(e, right), slice);
+                    self.skip_ws(chars);
                 }
                 '/' => {
                     chars.next();
                     let right = self.parse_unary(chars)?;
                     let slice = e.slice.join(&right.slice);
                     e = ExprNode::new(ExLab::Div(e, right), slice);
+                    self.skip_ws(chars);
                 }
                 '%' => {
                     chars.next();
                     let right = self.parse_unary(chars)?;
                     let slice = e.slice.join(&right.slice);
                     e = ExprNode::new(ExLab::Mod(e, right), slice);
+                    self.skip_ws(chars);
                 }
                 _ => break,
             }
@@ -92,6 +100,7 @@ impl Assembler {
 
     /// Parse a unary expression.
     fn parse_unary(&mut self, chars: &mut Peekable<LineChars>) -> Result<Box<ExprNode>, String> {
+        self.skip_ws(chars);
         if let Some((c, start)) = chars.peek().cloned() {
             if c == '-' {
                 chars.next();
@@ -108,10 +117,12 @@ impl Assembler {
         &mut self,
         chars: &mut Peekable<LineChars>,
     ) -> Result<Box<ExprNode>, String> {
+        self.skip_ws(chars);
         if let Some((c, start)) = chars.peek().cloned() {
             if c == '(' {
                 chars.next();
                 let e = self.parse_expr(chars)?;
+                self.skip_ws(chars);
                 if let Some((c, end)) = chars.next() {
                     if c == ')' {
                         return Ok(ExprNode::new(ExLab::Expr(e), start.join(&end)));

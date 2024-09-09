@@ -61,3 +61,23 @@ impl ExprNode {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        asm::Assembler,
+        parse::LineChars,
+        source::{self, Line},
+    };
+
+    #[test]
+    fn test_expr_parse_eval() {
+        let text = "(1 + 2) * 3 - 4";
+        let mut asm = Assembler::new(source::from_str(text, "text"));
+        let line = Line::new(text, "text", 1);
+        let e = asm
+            .parse_expr(&mut LineChars::new(&line).peekable())
+            .unwrap();
+        assert_eq!(e.eval(&mut asm), Ok((1 + 2) * 3 - 4));
+    }
+}
