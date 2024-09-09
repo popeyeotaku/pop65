@@ -58,7 +58,7 @@ impl Assembler {
     }
 
     /// Final assembly.
-    pub fn pass2(&mut self) -> Vec<u8> {
+    pub fn pass2(&mut self) -> Result<Vec<u8>, String> {
         self.program_counter = None;
         self.pass = Pass::Pass2;
 
