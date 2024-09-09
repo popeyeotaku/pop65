@@ -262,6 +262,8 @@ impl Assembler {
                     }
                 }
             }
+        } else if self.at_eol(chars) {
+            return Ok((AMode::Imp, None));
         }
         head.err("bad operand")
     }
