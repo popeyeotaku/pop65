@@ -135,11 +135,7 @@ impl Assembler {
     fn at_eol(&mut self, chars: &mut Peekable<LineChars>) -> bool {
         self.skip_ws(chars);
         if let Some((c, _)) = chars.next() {
-            if c == ';' {
-                true
-            } else {
-                false
-            }
+            c == ';'
         } else {
             true
         }
