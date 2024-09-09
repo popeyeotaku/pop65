@@ -11,7 +11,7 @@ pub fn assemble_str(src: &str, path: &str) -> Vec<u8> {
 
 /// Assemble a source file.
 pub fn assemble(src: Source) -> Vec<u8> {
-    let mut asm = Assembler::new(src);
+    let mut asm = Box::new(Assembler::new(src));
     asm.pass1();
     asm.pass2()
 }
