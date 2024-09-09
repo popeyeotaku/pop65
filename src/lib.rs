@@ -19,6 +19,7 @@ pub fn assemble(src: Source) -> Result<Vec<u8>, String> {
 mod action;
 mod asm;
 mod expr;
+mod opcode;
 mod parse;
 mod source;
 mod symbol;

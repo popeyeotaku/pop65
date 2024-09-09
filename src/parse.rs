@@ -8,6 +8,8 @@ use std::{
 use crate::{
     action::{Action, PseudoOp},
     asm::Assembler,
+    expr::ExprNode,
+    opcode::{find_op, AMode, OpCode},
     source::{Line, LineSlice},
 };
 
@@ -173,7 +175,95 @@ impl Assembler {
         opcode: LineSlice,
         chars: &mut Peekable<LineChars>,
     ) -> Result<Box<dyn Action>, String> {
-        todo!()
+        let op_name = opcode.text().to_ascii_lowercase();
+        if let Some(op) = find_op(&op_name) {
+            let (amode, expr) = self.parse_operand(chars)?;
+            Ok(Box::new(OpCode::new(op, opcode, amode, expr)))
+        } else {
+            opcode.err(&format!("unknown opcode '{}'", opcode.text()))
+        }
+    }
+
+    /// Parse an opcode operand.
+    fn parse_operand(
+        &mut self,
+        chars: &mut Peekable<LineChars>,
+    ) -> Result<(AMode, Option<Box<ExprNode>>), String> {
+        self.skip_ws(chars);
+        let head = {
+            if let Some((_, slice)) = chars.peek() {
+                slice.clone()
+            } else {
+                self.cur_line.as_ref().unwrap().slice(0, 0)
+            }
+        };
+        if let Some((c, _)) = chars.peek() {
+            match c {
+                '#' => {
+                    chars.next();
+                    return Ok((AMode::Imm, Some(self.parse_expr(chars)?)));
+                }
+                '(' => {
+                    chars.next();
+                    let expr = self.parse_expr(chars)?;
+                    self.skip_ws(chars);
+                    if let Some((c, _)) = chars.peek() {
+                        match c {
+                            ')' => {
+                                chars.next();
+                                return Ok((AMode::Ind, Some(expr)));
+                            }
+                            ',' => {
+                                chars.next();
+                                self.skip_ws(chars);
+                                if let Some((c, _)) = chars.peek() {
+                                    let c = *c;
+                                    chars.next();
+                                    self.skip_ws(chars);
+                                    if let Some((rparen, _)) = chars.peek() {
+                                        if *rparen == ')' {
+                                            chars.next();
+                                            match c {
+                                                'x' | 'X' => return Ok((AMode::IndX, Some(expr))),
+                                                'y' | 'Y' => return Ok((AMode::IndY, Some(expr))),
+                                                _ => (),
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            _ => (),
+                        }
+                    }
+                }
+                _ => {
+                    if self.at_eol(chars) {
+                        return Ok((AMode::Imp, None));
+                    } else {
+                        let expr = self.parse_expr(chars)?;
+                        self.skip_ws(chars);
+                        if let Some((c, _)) = chars.peek() {
+                            if *c == ',' {
+                                chars.next();
+                                self.skip_ws(chars);
+                                if let Some((c, _)) = chars.peek() {
+                                    let c = *c;
+                                    chars.next();
+                                    match c {
+                                        'x' | 'X' => return Ok((AMode::AbsX, Some(expr))),
+                                        'y' | 'Y' => return Ok((AMode::AbsY, Some(expr))),
+                                        _ => (),
+                                    }
+                                }
+                            } else {
+                                return Ok((AMode::Abs, Some(expr)));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        head.err("bad operand")
     }
 
     /// Parse the trailing comment, if any.
