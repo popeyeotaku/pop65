@@ -41,7 +41,7 @@ impl Assembler {
     /// Parse a '+'/'-' expression.
     fn parse_addsub(&mut self, chars: &mut Peekable<LineChars>) -> Result<Box<ExprNode>, String> {
         let mut e = self.parse_muldiv(chars)?;
-        
+
         self.skip_ws(chars);
         while let Some((c, _)) = chars.peek() {
             match c {
