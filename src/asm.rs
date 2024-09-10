@@ -67,7 +67,9 @@ impl Assembler {
 
         for parsed_line in &lines {
             if let Some(action) = &parsed_line.action {
-                output.extend(action.pass2(self)?);
+                let new_bytes = action.pass2(self)?;
+                self.pc_add(new_bytes.len() as u16)?;
+                output.extend(new_bytes);
             }
         }
 

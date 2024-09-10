@@ -51,7 +51,7 @@ bashe1  .word 0
         jmp start
 chrout  = $ffd2
 point1  = $fb
-msg     .byte 13,13,'hello world',13,13,0
+msg     .byte 13,13,'HELLO WORLD',13,13,0
 start   lda #<msg
         sta point1
         lda #>msg

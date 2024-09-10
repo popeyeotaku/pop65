@@ -121,7 +121,7 @@ static OP_TABLE: LazyLock<HashMap<&'static str, Op>> = LazyLock::new(|| {
         ("bcs", Op::new([(AMode::Rel, 176)])),
         ("bne", Op::new([(AMode::Rel, 208)])),
         ("beq", Op::new([(AMode::Rel, 240)])),
-        ("brk", Op::new([(AMode::Rel, 0)])),
+        ("brk", Op::new([(AMode::Imp, 0)])),
         (
             "cmp",
             Op::new([
