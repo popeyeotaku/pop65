@@ -144,4 +144,30 @@ bar     ";
         assert_eq!(info.symtab["foo"].value, Some(0));
         assert_eq!(info.symtab["bar"].value, Some(0x10));
     }
+
+    #[test]
+    fn test_label_comments() {
+        let src = "
+        .org 0
+; Foo does a 
+; bunch of different things.
+foo     .word foo   ; ignored
+; this is also ignored
+        .word bar
+bar     .word foo   ;   
+foobar  .word *     ; foobar's comment
+                    ; bar's comment is also ignored
+                    ; despite also having whitespace after it
+";
+        let info = assemble(source::from_str(src, "src")).unwrap();
+        assert_eq!(
+            info.symtab["foo"].comment,
+            Some("Foo does a\nbunch of different things.\n".to_string())
+        );
+        assert!(info.symtab["bar"].comment.is_none());
+        assert_eq!(
+            info.symtab["foobar"].comment,
+            Some("foobar's comment".to_string())
+        )
+    }
 }

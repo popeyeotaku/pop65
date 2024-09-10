@@ -7,10 +7,11 @@ use crate::source::LineSlice;
 /// An entry in the symbol table.
 #[derive(Eq)]
 pub struct Symbol {
-    name: String,
+    pub name: String,
     pub value: Option<u16>,
     pub defined_at: Option<Rc<LineSlice>>,
-    references: HashSet<Rc<LineSlice>>,
+    pub comment: Option<String>,
+    pub references: HashSet<Rc<LineSlice>>,
 }
 
 impl PartialEq for Symbol {
@@ -49,6 +50,9 @@ impl Display for Symbol {
             f.write_str("      ")?;
         }
         f.write_str(&self.name)?;
+        if let Some(c) = &self.comment {
+            f.write_fmt(format_args!(" : {}", c.replace("\n", " ")))?;
+        }
         Ok(())
     }
 }
@@ -62,6 +66,7 @@ impl Symbol {
             value: None,
             defined_at: None,
             references: refs,
+            comment: None,
         })
     }
 

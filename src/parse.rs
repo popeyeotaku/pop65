@@ -21,6 +21,23 @@ pub struct ParsedLine {
     pub comment: Option<Rc<LineSlice>>,
 }
 
+impl ParsedLine {
+    /// If we have a comment, remove its leading ';' and strip whitespace.
+    /// Returns Some(s) if the resulting string is non-empty.
+    pub fn filter_comment(&self) -> Option<&str> {
+        if let Some(l) = &self.comment {
+            let s = l.text()[1..].trim();
+            if s.is_empty() {
+                None
+            } else {
+                Some(s)
+            }
+        } else {
+            None
+        }
+    }
+}
+
 /// Allows searching through individual characters in a line.
 pub struct LineChars<'a> {
     line: &'a Rc<Line>,
@@ -177,8 +194,9 @@ impl Assembler {
                 Ok(Box::new(PseudoOp::new(name, Vec::new())))
             } else {
                 let mut args = vec![self.parse_expr(chars)?];
-                while let Some((c, _)) = chars.next() {
-                    if c == ',' {
+                while let Some((c, _)) = chars.peek() {
+                    if *c == ',' {
+                        chars.next();
                         args.push(self.parse_expr(chars)?);
                     } else {
                         break;

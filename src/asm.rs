@@ -25,6 +25,7 @@ pub struct Assembler {
     pub symtab: HashMap<String, Box<Symbol>>,
     pub program_counter: Option<u16>,
     pub cur_line: Option<Rc<Line>>,
+    building_comment: Option<String>,
 }
 
 impl Assembler {
@@ -38,6 +39,7 @@ impl Assembler {
             cur_line: None,
             debug_str: String::new(),
             debug_fmt: None,
+            building_comment: None,
         }
     }
 
@@ -51,12 +53,30 @@ impl Assembler {
         while let Some(line) = self.src_stk.next() {
             self.cur_line = Some(line.clone());
             let parsed = self.parse_line(line.clone())?;
+            let comment = parsed.filter_comment();
             if let Some(label_slice) = &parsed.label {
-                self.def_label(label_slice.text(), label_slice.clone())?;
+                let comment_label = {
+                    if let Some(s) = self.building_comment.take() {
+                        Some(s)
+                    } else {
+                        comment.map(String::from)
+                    }
+                };
+                self.def_label(label_slice.text(), label_slice.clone(), comment_label)?;
             }
             if let Some(action) = &parsed.action {
                 let size = action.pass1(self, parsed.label.clone())?;
                 self.pc_add(size)?;
+            }
+            if let Some(c) = comment {
+                if parsed.label.is_none() && parsed.action.is_none() {
+                    let s = self.building_comment.get_or_insert_with(String::new);
+                    s.push_str(c);
+                    s.push('\n');
+                }
+            }
+            if parsed.label.is_some() || parsed.action.is_some() {
+                self.building_comment = None;
             }
             self.parsed_lines.push(parsed);
         }
@@ -92,12 +112,24 @@ impl Assembler {
     }
 
     /// Output a debug info string.
-    fn debug_label(&mut self, label: &str, slice: Rc<LineSlice>, value: u16) -> Result<(), String> {
+    fn debug_label(
+        &mut self,
+        label: &str,
+        slice: Rc<LineSlice>,
+        value: u16,
+        comment: Option<&str>,
+    ) -> Result<(), String> {
         if let Some(f) = &self.debug_fmt {
             let mut chars = f.chars();
             while let Some(c) = chars.next() {
                 if c == '{' {
                     match chars.next() {
+                        Some('C') => {
+                            if chars.next() != Some('}') {
+                                return slice.err("bad debug format string");
+                            }
+                            self.debug_str.push_str(comment.unwrap_or(""));
+                        }
                         Some('V') => {
                             let mut starting_offset: u32 = 0;
                             for c in chars.by_ref() {
@@ -134,12 +166,22 @@ impl Assembler {
     }
 
     /// Define a new label at the current PC, complaining if it was redefined.
-    pub fn def_label(&mut self, label: &str, slice: Rc<LineSlice>) -> Result<(), String> {
+    pub fn def_label(
+        &mut self,
+        label: &str,
+        slice: Rc<LineSlice>,
+        comment_label: Option<String>,
+    ) -> Result<(), String> {
         let pc = *self.pc()?;
         if self.pass == Pass::Pass1 && self.debug_fmt.is_some() {
-            self.debug_label(label, slice.clone(), pc)?
+            self.debug_label(label, slice.clone(), pc, comment_label.as_deref())?
         }
-        self.def_symbol(label, slice, pc)
+        self.def_symbol(label, slice, pc)?;
+        if let Some(comment) = comment_label {
+            let sym = self.symtab.get_mut(label).unwrap();
+            sym.comment = Some(comment);
+        }
+        Ok(())
     }
 
     /// Look-up the symbol in the symbol table, creating it as undefined if it didn't exist.
@@ -222,11 +264,11 @@ mod tests {
         asm.program_counter = Some(0);
 
         asm.lookup("foobar", foobar.clone());
-        asm.def_label("foo", foo.clone()).unwrap();
+        asm.def_label("foo", foo.clone(), None).unwrap();
         asm.pc_add(2).unwrap();
-        asm.def_label("bar", bar.clone()).unwrap();
+        asm.def_label("bar", bar.clone(), None).unwrap();
         asm.pc_add(2).unwrap();
-        asm.def_label("foobar", foobar.clone()).unwrap();
+        asm.def_label("foobar", foobar.clone(), None).unwrap();
         asm.pc_add(2).unwrap();
 
         assert_eq!(asm.lookup("foo", foo).value, Some(0));
