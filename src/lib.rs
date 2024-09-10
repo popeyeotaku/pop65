@@ -1,19 +1,27 @@
 //! Pop65: a simple 6502 assembler.
 
+use std::{collections::HashMap, mem};
+
 use asm::Assembler;
+pub use source::from_file;
 use source::Source;
+pub use symbol::Symbol;
 
 /// Assemble code from a source string.
 pub fn assemble_str(src: &str, path: &str) -> Result<Vec<u8>, String> {
     let src = source::from_str(src, path);
-    assemble(src)
+    let (bytes, _) = assemble(src)?;
+    Ok(bytes)
 }
 
+pub type SymTab = HashMap<String, Box<Symbol>>;
+
 /// Assemble a source file.
-pub fn assemble(src: Source) -> Result<Vec<u8>, String> {
+pub fn assemble(src: Source) -> Result<(Vec<u8>, SymTab), String> {
     let mut asm = Box::new(Assembler::new(src));
     asm.pass1()?;
-    asm.pass2()
+    let bytes = asm.pass2()?;
+    Ok((bytes, mem::take(&mut asm.symtab)))
 }
 
 mod action;

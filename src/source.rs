@@ -1,12 +1,22 @@
 //! Source file handling.
 
-use std::cmp::{max, min};
+use std::{
+    cmp::{max, min},
+    error::Error,
+    fs,
+};
 
 /// Used to specify a line number.
 pub type LineNum = u32;
 
 /// Allows reading from source files.
 pub type Source = Box<dyn Iterator<Item = Line>>;
+
+/// Construct a source from a file.
+pub fn from_file(path: &str) -> Result<Source, Box<dyn Error>> {
+    let text = fs::read_to_string(path)?;
+    Ok(from_str(&text, path))
+}
 
 /// Construct a fake-o source from a single string.
 pub fn from_str(s: &str, path: &str) -> Source {

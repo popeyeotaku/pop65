@@ -1,15 +1,56 @@
 //! Support for asm symbols.
 
-use std::collections::HashSet;
+use std::{collections::HashSet, fmt::Display};
 
 use crate::source::LineSlice;
 
 /// An entry in the symbol table.
+#[derive(Eq)]
 pub struct Symbol {
     name: String,
     pub value: Option<u16>,
     pub defined_at: Option<LineSlice>,
     references: HashSet<LineSlice>,
+}
+
+impl PartialEq for Symbol {
+    fn eq(&self, other: &Self) -> bool {
+        if let Some(me) = self.value {
+            if let Some(them) = other.value {
+                return me == them;
+            }
+        }
+        self.name == other.name
+    }
+}
+
+impl PartialOrd for Symbol {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Symbol {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        if let Some(me) = self.value {
+            if let Some(them) = other.value {
+                return me.cmp(&them);
+            }
+        }
+        self.name.cmp(&other.name)
+    }
+}
+
+impl Display for Symbol {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(v) = self.value {
+            f.write_fmt(format_args!("{v:04X}: "))?;
+        } else {
+            f.write_str("      ")?;
+        }
+        f.write_str(&self.name)?;
+        Ok(())
+    }
 }
 
 impl Symbol {

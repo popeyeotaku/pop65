@@ -19,7 +19,7 @@ pub struct Assembler {
     src_stk: Box<SrcStack>,
     parsed_lines: Vec<ParsedLine>,
     pass: Pass,
-    symtab: HashMap<String, Box<Symbol>>,
+    pub symtab: HashMap<String, Box<Symbol>>,
     pub program_counter: Option<u16>,
     pub cur_line: Option<Line>,
 }
