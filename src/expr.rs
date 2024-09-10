@@ -71,8 +71,10 @@ mod tests {
     use crate::{
         asm::Assembler,
         parse::LineChars,
-        source::{self, Line},
+        source::{self, Line, LineSlice},
     };
+
+    use super::{ExLab, ExprNode};
 
     #[test]
     fn test_expr_parse_eval() {
@@ -83,5 +85,16 @@ mod tests {
             .parse_expr(&mut LineChars::new(&line).peekable())
             .unwrap();
         assert_eq!(e.eval(&mut asm), Ok((1 + 2) * 3 - 4));
+    }
+
+    #[test]
+    fn test_neg() {
+        let f = Rc::new(LineSlice::new(Rc::new(Line::new("foo", "foo", 1)), 0, 0));
+        let n = ExprNode::new(
+            ExLab::Neg(ExprNode::new(ExLab::Num(1), f.clone())),
+            f.clone(),
+        );
+        let mut a = Assembler::new(source::from_str("foo", "foo"));
+        assert_eq!(n.eval(&mut a), Ok(0xFFFF));
     }
 }
