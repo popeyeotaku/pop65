@@ -129,6 +129,13 @@ impl Assembler {
         self.skip_ws(chars);
 
         if let Some((c, start)) = chars.peek().cloned() {
+            if c == '=' {
+                chars.next();
+                return Ok(Some(Box::new(PseudoOp::new(
+                    start,
+                    vec![self.parse_expr(chars)?],
+                ))));
+            }
             if c == '.' {
                 chars.next();
                 return self.parse_pseudo(start, chars).map(Some);
@@ -221,7 +228,23 @@ impl Assembler {
                         match c {
                             ')' => {
                                 chars.next();
-                                return Ok((AMode::Ind, Some(expr)));
+                                self.skip_ws(chars);
+                                if let Some((c, _)) = chars.peek() {
+                                    if *c == ',' {
+                                        chars.next();
+                                        self.skip_ws(chars);
+                                        if let Some((c, _)) = chars.peek() {
+                                            if *c == 'y' || *c == 'Y' {
+                                                chars.next();
+                                                return Ok((AMode::IndY, Some(expr)));
+                                            }
+                                        }
+                                    } else {
+                                        return Ok((AMode::Ind, Some(expr)));
+                                    }
+                                } else {
+                                    return Ok((AMode::Ind, Some(expr)));
+                                }
                             }
                             ',' => {
                                 chars.next();
@@ -235,7 +258,6 @@ impl Assembler {
                                             chars.next();
                                             match c {
                                                 'x' | 'X' => return Ok((AMode::IndX, Some(expr))),
-                                                'y' | 'Y' => return Ok((AMode::IndY, Some(expr))),
                                                 _ => (),
                                             }
                                         }

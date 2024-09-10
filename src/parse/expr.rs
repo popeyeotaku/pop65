@@ -141,6 +141,9 @@ impl Assembler {
                 Ok(ExprNode::new(ExLab::Name, name))
             } else if c == '\'' || c == '"' {
                 self.parse_str(chars)
+            } else if c == '*' {
+                chars.next();
+                Ok(ExprNode::new(ExLab::Num(*self.pc()?), start))
             } else {
                 start.err("Missing primary expression")
             }

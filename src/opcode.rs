@@ -1,12 +1,6 @@
 //! Opcode support.
 
-use std::{
-    collections::{HashMap, HashSet},
-    fmt::Display,
-    hash::Hash,
-    ops::Deref,
-    sync::LazyLock,
-};
+use std::{collections::HashMap, fmt::Display, ops::Deref, sync::LazyLock};
 
 use crate::{action::Action, asm::Assembler, expr::ExprNode, source::LineSlice};
 
@@ -24,6 +18,7 @@ pub enum AMode {
     Ind,
     IndX,
     IndY,
+    Rel,
 }
 
 impl Display for AMode {
@@ -40,6 +35,7 @@ impl Display for AMode {
             AMode::Ind => "indirect",
             AMode::IndX => "x indirect",
             AMode::IndY => "y indirect",
+            AMode::Rel => "relative",
         };
         f.write_str(name)
     }
@@ -60,6 +56,7 @@ impl AMode {
             AMode::Ind => 2,
             AMode::IndX => 2,
             AMode::IndY => 2,
+            AMode::Rel => 2,
         }
     }
 }
@@ -116,15 +113,15 @@ static OP_TABLE: LazyLock<HashMap<&'static str, Op>> = LazyLock::new(|| {
             ]),
         ),
         ("bit", Op::new([(AMode::Zp, 36), (AMode::Abs, 44)])),
-        ("bpl", Op::new([(AMode::Imp, 16)])),
-        ("bmi", Op::new([(AMode::Imp, 48)])),
-        ("bvc", Op::new([(AMode::Imp, 80)])),
-        ("bvs", Op::new([(AMode::Imp, 112)])),
-        ("bcc", Op::new([(AMode::Imp, 144)])),
-        ("bcs", Op::new([(AMode::Imp, 176)])),
-        ("bne", Op::new([(AMode::Imp, 208)])),
-        ("beq", Op::new([(AMode::Imp, 240)])),
-        ("brk", Op::new([(AMode::Imp, 0)])),
+        ("bpl", Op::new([(AMode::Rel, 16)])),
+        ("bmi", Op::new([(AMode::Rel, 48)])),
+        ("bvc", Op::new([(AMode::Rel, 80)])),
+        ("bvs", Op::new([(AMode::Rel, 112)])),
+        ("bcc", Op::new([(AMode::Rel, 144)])),
+        ("bcs", Op::new([(AMode::Rel, 176)])),
+        ("bne", Op::new([(AMode::Rel, 208)])),
+        ("beq", Op::new([(AMode::Rel, 240)])),
+        ("brk", Op::new([(AMode::Rel, 0)])),
         (
             "cmp",
             Op::new([
@@ -315,9 +312,6 @@ static OP_TABLE: LazyLock<HashMap<&'static str, Op>> = LazyLock::new(|| {
     ])
 });
 
-static BRANCH_OPS: LazyLock<HashSet<&'static str>> =
-    LazyLock::new(|| HashSet::from(["bcc", "bcs", "beq", "bne", "bmi", "bpl", "bvc", "bvs"]));
-
 /// Lookup an opcode in the op table.
 pub fn find_op(op_name: &str) -> Option<&'static Op> {
     OP_TABLE.deref().get(op_name)
@@ -359,11 +353,6 @@ impl OpCode {
         false
     }
 
-    /// Return a flag if this is a "branch" format instruction.
-    fn is_branch(&self) -> bool {
-        BRANCH_OPS.contains(self.op_slice.text().to_lowercase().as_str())
-    }
-
     /// Construct the *real* addressing mode, taking into account zero-page, etc.
     fn real_amode(&self, asm: &mut Assembler) -> AMode {
         match self.amode {
@@ -373,7 +362,9 @@ impl OpCode {
             AMode::ZpX => AMode::ZpX,
             AMode::ZpY => AMode::ZpY,
             AMode::Abs => {
-                if self.op.op_bytes.contains_key(&AMode::ZpX) && self.is_zp(asm) {
+                if self.op.op_bytes.contains_key(&AMode::Rel) {
+                    AMode::Rel
+                } else if self.op.op_bytes.contains_key(&AMode::ZpX) && self.is_zp(asm) {
                     AMode::Zp
                 } else {
                     AMode::Abs
@@ -396,6 +387,7 @@ impl OpCode {
             AMode::Ind => AMode::Ind,
             AMode::IndX => AMode::IndX,
             AMode::IndY => AMode::IndY,
+            AMode::Rel => AMode::Rel,
         }
     }
 
@@ -405,8 +397,17 @@ impl OpCode {
         if let Some(expr) = self.expr.as_ref() {
             let val = expr.eval(asm)?;
             let mut val_bytes = Vec::from(val.to_le_bytes());
-            if self.is_branch() {
-                todo!()
+            if amode == AMode::Rel {
+                let here = (*asm.pc()? as i32) + 2;
+                let there = val as i32;
+                let offset = there - here;
+                if let Ok(byte_offset) = i8::try_from(offset) {
+                    return Ok(Vec::from(byte_offset.to_le_bytes()));
+                } else {
+                    return self
+                        .line_slice()
+                        .err(&format!("offset {offset} out of range"));
+                }
             } else {
                 match amode.byte_size() - 1 {
                     0 => panic!(),
@@ -437,8 +438,11 @@ impl Action for OpCode {
         let _ = label;
         let amode = self.real_amode(assembler);
         if !self.op.op_bytes.contains_key(&amode) {
-            self.line_slice()
-                .err(&format!("addressing mode '{}' not supported", amode))
+            self.line_slice().err(&format!(
+                "addressing mode '{}' not supported for '{}'",
+                amode,
+                self.op_slice.text()
+            ))
         } else {
             Ok(amode.byte_size() as u16)
         }

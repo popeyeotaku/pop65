@@ -1,6 +1,11 @@
 //! Pseudo-Op support.
 
-use crate::{action::Action, asm::Assembler, expr::ExprNode, source::LineSlice};
+use crate::{
+    action::Action,
+    asm::Assembler,
+    expr::{ExLab, ExprNode},
+    source::LineSlice,
+};
 
 /// Indicates a pseudo-op.
 pub struct PseudoOp {
@@ -18,6 +23,15 @@ impl PseudoOp {
     fn arg_count_err<T>(&self) -> Result<T, String> {
         self.line_slice().err("incorrect number of arguments")
     }
+
+    /// If the expression tree is a string node, return that.
+    fn is_str_arg(arg: &ExprNode) -> Option<&str> {
+        match &arg.label {
+            ExLab::Expr(e) => Self::is_str_arg(e),
+            ExLab::Str(s) => Some(s),
+            _ => None,
+        }
+    }
 }
 
 impl Action for PseudoOp {
@@ -28,6 +42,20 @@ impl Action for PseudoOp {
     ) -> Result<u16, String> {
         let name = self.op_name.text().to_ascii_lowercase();
         match name.as_str() {
+            "=" => {
+                if self.args.len() != 1 {
+                    return self.arg_count_err();
+                }
+                if let Some(label) = label {
+                    let value = Some(self.args[0].eval(assembler)?);
+                    let sym = assembler.lookup(label.text(), label);
+                    sym.defined_at = Some(*label.clone());
+                    sym.value = value;
+                    Ok(0)
+                } else {
+                    self.line_slice().err("missing label for '='")
+                }
+            }
             ".org" => {
                 if self.args.len() == 1 {
                     let val = self.args[0].eval(assembler)?;
@@ -36,6 +64,17 @@ impl Action for PseudoOp {
                 } else {
                     self.arg_count_err()
                 }
+            }
+            ".byte" => {
+                let mut sum = 0;
+                for arg in &self.args {
+                    if let Some(s) = Self::is_str_arg(arg) {
+                        sum += s.len() as u16;
+                    } else {
+                        sum += 1;
+                    }
+                }
+                Ok(sum)
             }
             ".word" => Ok((self.args.len() * 2) as u16),
             _ => self
@@ -47,7 +86,19 @@ impl Action for PseudoOp {
     fn pass2(&self, assembler: &mut Assembler) -> Result<Vec<u8>, String> {
         let name = self.op_name.text().to_ascii_lowercase();
         match name.as_str() {
+            "=" => Ok(vec![]),
             ".org" => self.pass1(assembler, &None).map(|_| vec![]),
+            ".byte" => {
+                let mut bytes = Vec::with_capacity(self.args.len());
+                for arg in &self.args {
+                    if let Some(s) = Self::is_str_arg(arg) {
+                        bytes.extend(s.bytes());
+                    } else {
+                        bytes.push(arg.eval(assembler)?.to_le_bytes()[0]);
+                    }
+                }
+                Ok(bytes)
+            }
             ".word" => {
                 let mut bytes = Vec::with_capacity(self.args.len() * 2);
                 for arg in &self.args {

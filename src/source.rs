@@ -113,7 +113,7 @@ impl Line {
 
     /// Construct an error message at this line's pos() as a header.
     pub fn err<T>(&self, msg: &str) -> Result<T, String> {
-        Err(format!("{}:{}", self.pos(), msg))
+        Err(format!("{}: {}", self.pos(), msg))
     }
 }
 
@@ -181,7 +181,7 @@ impl LineSlice {
 
     /// Construct an error message using this slice's pos() as a header.
     pub fn err<T>(&self, msg: &str) -> Result<T, String> {
-        Err(format!("{}:{}", self.pos(), msg))
+        Err(format!("{}: {}", self.pos(), msg))
     }
 
     /// Return the underlying path.

@@ -8,7 +8,7 @@ use crate::source::LineSlice;
 pub struct Symbol {
     name: String,
     pub value: Option<u16>,
-    defined_at: Option<LineSlice>,
+    pub defined_at: Option<LineSlice>,
     references: HashSet<LineSlice>,
 }
 
