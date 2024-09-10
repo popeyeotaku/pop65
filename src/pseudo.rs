@@ -1,6 +1,6 @@
 //! Pseudo-Op support.
 
-use std::rc::Rc;
+use std::{fs, rc::Rc};
 
 use crate::{
     action::Action,
@@ -62,6 +62,14 @@ impl Action for PseudoOp {
                     self.line_slice().err("expected string argument")
                 }
             }
+            ".ds" => match self.args.len() {
+                1 | 2 => Ok(self.args[0].eval(assembler)?),
+                _ => self.line_slice().err("Expected one or two args"),
+            },
+            ".bin" | ".incbin" => {
+                let bytes = self.pass2(assembler)?;
+                Ok(bytes.len() as u16)
+            }
             ".inc" | ".lib" | ".fil" => {
                 for arg in &self.args {
                     if let Some(path) = Self::is_str_arg(arg) {
@@ -122,6 +130,28 @@ impl Action for PseudoOp {
 
     fn pass2(&self, assembler: &mut Assembler) -> Result<Vec<u8>, String> {
         match self.op_name_lcase.as_str() {
+            ".ds" => match self.args.len() {
+                1 => Ok(vec![0; self.args[0].eval(assembler)? as usize]),
+                2 => Ok(vec![
+                    self.args[1].eval(assembler)?.to_le_bytes()[0];
+                    self.args[0].eval(assembler)? as usize
+                ]),
+                _ => panic!(),
+            },
+            ".bin" | ".incbin" => {
+                if self.args.len() != 1 {
+                    self.arg_count_err()
+                } else if let Some(path) = Self::is_str_arg(&self.args[0]) {
+                    match fs::read(path) {
+                        Ok(bytes) => Ok(bytes),
+                        Err(e) => self
+                            .line_slice()
+                            .err(&format!("error loading '{}': {}", path, e)),
+                    }
+                } else {
+                    self.line_slice().err("expected filename")
+                }
+            }
             ".inc" | ".lib" | ".fil" => Ok(vec![]),
             "=" => Ok(vec![]),
             ".org" => self.pass1(assembler, None).map(|_| vec![]),

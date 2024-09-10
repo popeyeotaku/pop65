@@ -57,6 +57,8 @@ mod symbol;
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
+
     use crate::{assemble, assemble_str, from_file, source};
 
     #[test]
@@ -121,5 +123,25 @@ foo     .word foo";
         assert_eq!(&info.bytes, &vec![0x00, 0x80]);
         assert_eq!(info.symtab["foo"].value, Some(0x8000));
         assert_eq!(&info.debug_str, "P:14000:foo\n");
+    }
+
+    #[test]
+    fn test_bin() {
+        let foo: [u8; 4] = [1, 2, 3, 4];
+        fs::write("foo.bin", foo).unwrap();
+        let src = "
+        .org 0
+foo     .incbin \"foo.bin\"
+        .ds $10-*
+bar     ";
+        let info = assemble(source::from_str(src, "src")).unwrap();
+        let mut long_foo: Vec<u8> = vec![0; 0x10];
+        long_foo[0] = 1;
+        long_foo[1] = 2;
+        long_foo[2] = 3;
+        long_foo[3] = 4;
+        assert_eq!(&info.bytes, &long_foo);
+        assert_eq!(info.symtab["foo"].value, Some(0));
+        assert_eq!(info.symtab["bar"].value, Some(0x10));
     }
 }
