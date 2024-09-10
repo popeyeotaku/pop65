@@ -171,7 +171,12 @@ impl LineSlice {
     /// A line with path "foo", line_num 11, start_char 3 will pos() as
     /// "foo:11:3".
     pub fn pos(&self) -> String {
-        format!("{}:{}:{}", self.path(), self.line_num(), self.start_char)
+        format!(
+            "{}:{}:{}",
+            self.path(),
+            self.line_num(),
+            self.start_char + 1
+        )
     }
 
     /// Construct an error message using this slice's pos() as a header.
@@ -260,6 +265,6 @@ mod tests {
         let foo = Line::new("foobar", "foo", 11);
         let bar = LineSlice::new(&foo, 3, 6);
         assert_eq!(&foo.pos(), "foo:11");
-        assert_eq!(&bar.pos(), "foo:11:3");
+        assert_eq!(&bar.pos(), "foo:11:4");
     }
 }

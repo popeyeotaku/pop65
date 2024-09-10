@@ -1,6 +1,12 @@
 //! Opcode support.
 
-use std::{collections::HashMap, ops::Deref, sync::LazyLock};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::Display,
+    hash::Hash,
+    ops::Deref,
+    sync::LazyLock,
+};
 
 use crate::{action::Action, asm::Assembler, expr::ExprNode, source::LineSlice};
 
@@ -18,6 +24,25 @@ pub enum AMode {
     Ind,
     IndX,
     IndY,
+}
+
+impl Display for AMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let name = match self {
+            AMode::Imm => "immediate",
+            AMode::Imp => "implied",
+            AMode::Zp => "zero page",
+            AMode::ZpX => "zero page, x indexed",
+            AMode::ZpY => "zero page, y indexed",
+            AMode::Abs => "absolute",
+            AMode::AbsX => "absolute, x indexed",
+            AMode::AbsY => "absolute, y indexed",
+            AMode::Ind => "indirect",
+            AMode::IndX => "x indirect",
+            AMode::IndY => "y indirect",
+        };
+        f.write_str(name)
+    }
 }
 
 impl AMode {
@@ -290,6 +315,9 @@ static OP_TABLE: LazyLock<HashMap<&'static str, Op>> = LazyLock::new(|| {
     ])
 });
 
+static BRANCH_OPS: LazyLock<HashSet<&'static str>> =
+    LazyLock::new(|| HashSet::from(["bcc", "bcs", "beq", "bne", "bmi", "bpl", "bvc", "bvs"]));
+
 /// Lookup an opcode in the op table.
 pub fn find_op(op_name: &str) -> Option<&'static Op> {
     OP_TABLE.deref().get(op_name)
@@ -318,9 +346,57 @@ impl OpCode {
         }
     }
 
+    /// Return a flag if this thing has an expression that can be evaluated
+    /// into zero page.
+    fn is_zp(&self, asm: &mut Assembler) -> bool {
+        if let Some(expr) = self.expr.as_ref() {
+            if let Ok(val) = expr.eval(asm) {
+                if val <= u8::MAX as u16 {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    /// Return a flag if this is a "branch" format instruction.
+    fn is_branch(&self) -> bool {
+        BRANCH_OPS.contains(self.op_slice.text().to_lowercase().as_str())
+    }
+
     /// Construct the *real* addressing mode, taking into account zero-page, etc.
-    fn real_amode(&self) -> AMode {
-        todo!()
+    fn real_amode(&self, asm: &mut Assembler) -> AMode {
+        match self.amode {
+            AMode::Imm => AMode::Imm,
+            AMode::Imp => AMode::Imp,
+            AMode::Zp => AMode::Zp,
+            AMode::ZpX => AMode::ZpX,
+            AMode::ZpY => AMode::ZpY,
+            AMode::Abs => {
+                if self.op.op_bytes.contains_key(&AMode::ZpX) && self.is_zp(asm) {
+                    AMode::Zp
+                } else {
+                    AMode::Abs
+                }
+            }
+            AMode::AbsX => {
+                if self.op.op_bytes.contains_key(&AMode::ZpX) && self.is_zp(asm) {
+                    AMode::ZpX
+                } else {
+                    AMode::AbsX
+                }
+            }
+            AMode::AbsY => {
+                if self.op.op_bytes.contains_key(&AMode::ZpY) && self.is_zp(asm) {
+                    AMode::ZpY
+                } else {
+                    AMode::AbsY
+                }
+            }
+            AMode::Ind => AMode::Ind,
+            AMode::IndX => AMode::IndX,
+            AMode::IndY => AMode::IndY,
+        }
     }
 
     /// Evaluate our expression, if any, and return its bytes corresponding to
@@ -328,8 +404,23 @@ impl OpCode {
     fn eval(&self, amode: AMode, asm: &mut Assembler) -> Result<Vec<u8>, String> {
         if let Some(expr) = self.expr.as_ref() {
             let val = expr.eval(asm)?;
-            let val_bytes = Vec::from(val.to_le_bytes());
-            todo!();
+            let mut val_bytes = Vec::from(val.to_le_bytes());
+            if self.is_branch() {
+                todo!()
+            } else {
+                match amode.byte_size() - 1 {
+                    0 => panic!(),
+                    1 => {
+                        if val_bytes.pop() != Some(0) {
+                            return self
+                                .line_slice()
+                                .err(&format!("value {val:04X} out of range"));
+                        }
+                    }
+                    2 => (),
+                    _ => panic!(),
+                }
+            }
             Ok(val_bytes)
         } else {
             Ok(Vec::new())
@@ -343,11 +434,18 @@ impl Action for OpCode {
         assembler: &mut crate::asm::Assembler,
         label: &Option<Box<LineSlice>>,
     ) -> Result<u16, String> {
-        Ok(self.real_amode().byte_size() as u16)
+        let _ = label;
+        let amode = self.real_amode(assembler);
+        if !self.op.op_bytes.contains_key(&amode) {
+            self.line_slice()
+                .err(&format!("addressing mode '{}' not supported", amode))
+        } else {
+            Ok(amode.byte_size() as u16)
+        }
     }
 
     fn pass2(&self, assembler: &mut crate::asm::Assembler) -> Result<Vec<u8>, String> {
-        let amode = self.real_amode();
+        let amode = self.real_amode(assembler);
         let mut bytes = self.eval(amode, assembler)?;
         bytes.insert(0, self.op.op_bytes[&amode]);
         Ok(bytes)

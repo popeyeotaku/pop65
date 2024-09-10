@@ -6,10 +6,11 @@ use std::{
 };
 
 use crate::{
-    action::{Action, PseudoOp},
+    action::Action,
     asm::Assembler,
     expr::ExprNode,
     opcode::{find_op, AMode, OpCode},
+    pseudo::PseudoOp,
     source::{Line, LineSlice},
 };
 
@@ -86,7 +87,16 @@ impl Assembler {
         &mut self,
         chars: &mut Peekable<LineChars>,
     ) -> Result<Option<LineSlice>, String> {
-        Ok(self.parse_name(chars))
+        if let Some(name) = self.parse_name(chars) {
+            let opchk = name.text().to_ascii_lowercase();
+            if find_op(opchk.as_str()).is_some() {
+                Ok(None)
+            } else {
+                Ok(Some(name))
+            }
+        } else {
+            Ok(None)
+        }
     }
 
     /// Grab a leading Name, if any.
@@ -136,8 +146,8 @@ impl Assembler {
     /// (skips whitespace and also exits on a comment).
     fn at_eol(&mut self, chars: &mut Peekable<LineChars>) -> bool {
         self.skip_ws(chars);
-        if let Some((c, _)) = chars.next() {
-            c == ';'
+        if let Some((c, _)) = chars.peek() {
+            *c == ';'
         } else {
             true
         }
@@ -242,6 +252,9 @@ impl Assembler {
                     } else {
                         let expr = self.parse_expr(chars)?;
                         self.skip_ws(chars);
+                        if self.at_eol(chars) {
+                            return Ok((AMode::Abs, Some(expr)));
+                        }
                         if let Some((c, _)) = chars.peek() {
                             if *c == ',' {
                                 chars.next();
@@ -255,8 +268,6 @@ impl Assembler {
                                         _ => (),
                                     }
                                 }
-                            } else {
-                                return Ok((AMode::Abs, Some(expr)));
                             }
                         }
                     }

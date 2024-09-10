@@ -20,7 +20,7 @@ pub struct Assembler {
     parsed_lines: Vec<ParsedLine>,
     pass: Pass,
     symtab: HashMap<String, Box<Symbol>>,
-    program_counter: Option<u16>,
+    pub program_counter: Option<u16>,
     pub cur_line: Option<Line>,
 }
 
