@@ -128,7 +128,8 @@ impl Assembler {
                             if chars.next() != Some('}') {
                                 return slice.err("bad debug format string");
                             }
-                            self.debug_str.push_str(comment.unwrap_or(""));
+                            self.debug_str
+                                .push_str(&comment.unwrap_or("").replace("\n", " "));
                         }
                         Some('V') => {
                             let mut starting_offset: u32 = 0;
