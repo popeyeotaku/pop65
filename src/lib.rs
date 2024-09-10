@@ -24,6 +24,17 @@ pub fn assemble(src: Source) -> Result<(Vec<u8>, SymTab), String> {
     Ok((bytes, mem::take(&mut asm.symtab)))
 }
 
+/// Dump the symbol table to a sorted string.
+pub fn dump_symtab(symtab: SymTab) -> String {
+    let mut symstr = String::new();
+    let mut symbols = Vec::from_iter(symtab.values());
+    symbols.sort();
+    for symbol in symbols {
+        symstr.push_str(&format!("{}\n", symbol));
+    }
+    symstr
+}
+
 mod action;
 mod asm;
 mod expr;
