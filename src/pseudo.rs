@@ -37,6 +37,7 @@ impl Action for PseudoOp {
                     self.arg_count_err()
                 }
             }
+            ".word" => Ok((self.args.len() * 2) as u16),
             _ => self
                 .line_slice()
                 .err(&format!("bad pseudo-op '{}'", self.op_name.text())),
@@ -47,6 +48,13 @@ impl Action for PseudoOp {
         let name = self.op_name.text().to_ascii_lowercase();
         match name.as_str() {
             ".org" => self.pass1(assembler, &None).map(|_| vec![]),
+            ".word" => {
+                let mut bytes = Vec::with_capacity(self.args.len() * 2);
+                for arg in &self.args {
+                    bytes.extend(arg.eval(assembler)?.to_le_bytes());
+                }
+                Ok(bytes)
+            }
             _ => self.pass1(assembler, &None).map(|_| vec![]),
         }
     }
