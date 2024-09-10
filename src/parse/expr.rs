@@ -1,6 +1,6 @@
 //! Expression parsing.
 
-use std::iter::Peekable;
+use std::{iter::Peekable, rc::Rc};
 
 use crate::{
     asm::Assembler,
@@ -23,13 +23,13 @@ impl Assembler {
                 '<' => {
                     chars.next();
                     let right = self.parse_hilo(chars)?;
-                    let slice = start.join(&right.slice);
+                    let slice = Rc::new(start.join(&right.slice));
                     return Ok(ExprNode::new(ExLab::Lo(right), slice));
                 }
                 '>' => {
                     chars.next();
                     let right = self.parse_hilo(chars)?;
-                    let slice = start.join(&right.slice);
+                    let slice = Rc::new(start.join(&right.slice));
                     return Ok(ExprNode::new(ExLab::Hi(right), slice));
                 }
                 _ => (),
@@ -48,14 +48,14 @@ impl Assembler {
                 '+' => {
                     chars.next();
                     let right = self.parse_muldiv(chars)?;
-                    let slice = e.slice.join(&right.slice);
+                    let slice = Rc::new(e.slice.join(&right.slice));
                     e = ExprNode::new(ExLab::Add(e, right), slice);
                     self.skip_ws(chars);
                 }
                 '-' => {
                     chars.next();
                     let right = self.parse_muldiv(chars)?;
-                    let slice = e.slice.join(&right.slice);
+                    let slice = Rc::new(e.slice.join(&right.slice));
                     e = ExprNode::new(ExLab::Sub(e, right), slice);
                     self.skip_ws(chars);
                 }
@@ -74,21 +74,21 @@ impl Assembler {
                 '*' => {
                     chars.next();
                     let right = self.parse_unary(chars)?;
-                    let slice = e.slice.join(&right.slice);
+                    let slice = Rc::new(e.slice.join(&right.slice));
                     e = ExprNode::new(ExLab::Mul(e, right), slice);
                     self.skip_ws(chars);
                 }
                 '/' => {
                     chars.next();
                     let right = self.parse_unary(chars)?;
-                    let slice = e.slice.join(&right.slice);
+                    let slice = Rc::new(e.slice.join(&right.slice));
                     e = ExprNode::new(ExLab::Div(e, right), slice);
                     self.skip_ws(chars);
                 }
                 '%' => {
                     chars.next();
                     let right = self.parse_unary(chars)?;
-                    let slice = e.slice.join(&right.slice);
+                    let slice = Rc::new(e.slice.join(&right.slice));
                     e = ExprNode::new(ExLab::Mod(e, right), slice);
                     self.skip_ws(chars);
                 }
@@ -105,7 +105,7 @@ impl Assembler {
             if c == '-' {
                 chars.next();
                 let right = self.parse_unary(chars)?;
-                let slice = start.join(&right.slice);
+                let slice = Rc::new(start.join(&right.slice));
                 return Ok(ExprNode::new(ExLab::Neg(right), slice));
             }
         }
@@ -125,7 +125,7 @@ impl Assembler {
                 self.skip_ws(chars);
                 if let Some((c, end)) = chars.next() {
                     if c == ')' {
-                        return Ok(ExprNode::new(ExLab::Expr(e), start.join(&end)));
+                        return Ok(ExprNode::new(ExLab::Expr(e), Rc::new(start.join(&end))));
                     }
                 }
                 start.err("missing closing ')'")
@@ -137,7 +137,7 @@ impl Assembler {
             } else if c.is_ascii_alphabetic() {
                 let name = self.parse_name(chars).unwrap();
                 // Ensure this reference to the symbol is noticed
-                self.lookup(name.text(), &name);
+                self.lookup(name.text(), name.clone());
                 Ok(ExprNode::new(ExLab::Name, name))
             } else if c == '\'' || c == '"' {
                 self.parse_str(chars)
@@ -168,7 +168,7 @@ impl Assembler {
         while let Some((c, end)) = chars.peek() {
             if let Some(digit) = c.to_digit(base as u32) {
                 i = i * (base as u16) + (digit as u16);
-                slice = slice.join(end);
+                slice = Rc::new(slice.join(end));
                 chars.next();
             } else {
                 break;
@@ -183,7 +183,7 @@ impl Assembler {
         let mut s = String::new();
         for (c, end) in chars.by_ref() {
             if c == quote {
-                let slice = start.join(&end);
+                let slice = Rc::new(start.join(&end));
                 return Ok(ExprNode::new(ExLab::Str(s), slice));
             } else {
                 s.push(c);

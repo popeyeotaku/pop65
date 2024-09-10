@@ -1,6 +1,6 @@
 //! Opcode support.
 
-use std::{collections::HashMap, fmt::Display, ops::Deref, sync::LazyLock};
+use std::{collections::HashMap, fmt::Display, ops::Deref, rc::Rc, sync::LazyLock};
 
 use crate::{action::Action, asm::Assembler, expr::ExprNode, source::LineSlice};
 
@@ -320,7 +320,7 @@ pub fn find_op(op_name: &str) -> Option<&'static Op> {
 /// A 6502 opcode in the actual source code.
 pub struct OpCode {
     op: &'static Op,
-    op_slice: LineSlice,
+    op_slice: Rc<LineSlice>,
     amode: AMode,
     expr: Option<Box<ExprNode>>,
 }
@@ -328,7 +328,7 @@ pub struct OpCode {
 impl OpCode {
     pub fn new(
         op: &'static Op,
-        op_slice: LineSlice,
+        op_slice: Rc<LineSlice>,
         amode: AMode,
         expr: Option<Box<ExprNode>>,
     ) -> Self {
@@ -433,7 +433,7 @@ impl Action for OpCode {
     fn pass1(
         &self,
         assembler: &mut crate::asm::Assembler,
-        label: &Option<Box<LineSlice>>,
+        label: Option<Rc<LineSlice>>,
     ) -> Result<u16, String> {
         let _ = label;
         let amode = self.real_amode(assembler);
@@ -455,9 +455,9 @@ impl Action for OpCode {
         Ok(bytes)
     }
 
-    fn line_slice(&self) -> LineSlice {
+    fn line_slice(&self) -> Rc<LineSlice> {
         if let Some(expr) = self.expr.as_ref() {
-            self.op_slice.join(&expr.slice)
+            Rc::new(self.op_slice.join(&expr.slice))
         } else {
             self.op_slice.clone()
         }

@@ -4,13 +4,14 @@ use std::{
     cmp::{max, min},
     error::Error,
     fs,
+    rc::Rc,
 };
 
 /// Used to specify a line number.
 pub type LineNum = u32;
 
 /// Allows reading from source files.
-pub type Source = Box<dyn Iterator<Item = Line>>;
+pub type Source = Box<dyn Iterator<Item = Rc<Line>>>;
 
 /// Construct a source from a file.
 pub fn from_file(path: &str) -> Result<Source, Box<dyn Error>> {
@@ -41,13 +42,13 @@ impl StrSrc {
 }
 
 impl Iterator for StrSrc {
-    type Item = Line;
+    type Item = Rc<Line>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(text) = self.lines.pop() {
             let line_num = self.line_num;
             self.line_num += 1;
-            Some(Line::new(&text, &self.path, line_num))
+            Some(Rc::new(Line::new(&text, &self.path, line_num)))
         } else {
             None
         }
@@ -73,7 +74,7 @@ impl SrcStack {
 }
 
 impl Iterator for SrcStack {
-    type Item = Line;
+    type Item = Rc<Line>;
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
@@ -92,7 +93,7 @@ impl Iterator for SrcStack {
 }
 
 /// A single line of input.
-#[derive(PartialEq, Debug, Clone, Eq, Hash)]
+#[derive(PartialEq, Debug, Eq, Hash)]
 pub struct Line {
     pub text: String,
     pub path: String,
@@ -106,11 +107,6 @@ impl Line {
             path: path.to_string(),
             line_num,
         }
-    }
-
-    /// Return a LineSlice into this line.
-    pub fn slice(&self, start_char: u16, end_char: u16) -> LineSlice {
-        LineSlice::new(self, start_char, end_char)
     }
 
     /// Return the position of the source line.
@@ -128,9 +124,9 @@ impl Line {
 }
 
 /// A slice within a given line.
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+#[derive(PartialEq, Eq, Hash, Debug)]
 pub struct LineSlice {
-    line: Line,
+    line: Rc<Line>,
     pub start_char: u16,
     pub end_char: u16,
     start_index: u16,
@@ -138,8 +134,7 @@ pub struct LineSlice {
 }
 
 impl LineSlice {
-    pub fn new(line: &Line, start_char: u16, end_char: u16) -> Self {
-        let line = line.clone();
+    pub fn new(line: Rc<Line>, start_char: u16, end_char: u16) -> Self {
         let (start, _) = line
             .text
             .char_indices()
@@ -165,7 +160,7 @@ impl LineSlice {
     pub fn join(&self, other: &LineSlice) -> Self {
         assert_eq!(&self.line, &other.line);
         Self::new(
-            &self.line,
+            self.line.clone(),
             min(self.start_char, other.start_char),
             max(self.end_char, other.end_char),
         )
@@ -173,7 +168,7 @@ impl LineSlice {
 
     /// Return a cloned LineSlice, but with a new ending position.
     pub fn with_end(&self, end_char: u16) -> Self {
-        Self::new(&self.line, self.start_char, end_char)
+        Self::new(self.line.clone(), self.start_char, end_char)
     }
 
     /// Return a string representing the position in the line.
@@ -219,17 +214,22 @@ impl LineSlice {
 
 #[cfg(test)]
 mod tests {
+    use std::rc::Rc;
+
     use super::{from_str, Line, LineSlice, SrcStack};
 
     #[test]
     fn test_strsrc() {
         let foobar = "foo\nbar\nfoobar\n";
         let src = from_str(foobar, "foobar");
-        let cmp = vec![
-            Line::new("foo", "foobar", 1),
-            Line::new("bar", "foobar", 2),
-            Line::new("foobar", "foobar", 3),
-        ];
+        let cmp = Vec::from_iter(
+            [
+                Line::new("foo", "foobar", 1),
+                Line::new("bar", "foobar", 2),
+                Line::new("foobar", "foobar", 3),
+            ]
+            .map(Rc::new),
+        );
         assert_eq!(Vec::from_iter(src), cmp);
     }
 
@@ -238,29 +238,32 @@ mod tests {
         let foobar = "foo\nbar\nfoobar\n";
         let barfoo = "barfoo\nbar\nfoo\n";
         let mut stk = SrcStack::new(from_str(foobar, "foobar"));
-        assert_eq!(stk.next(), Some(Line::new("foo", "foobar", 1)));
+        assert_eq!(stk.next(), Some(Rc::new(Line::new("foo", "foobar", 1))));
         stk.push(from_str(barfoo, "barfoo"));
         assert_eq!(
             Vec::from_iter(stk),
-            vec![
-                Line::new("barfoo", "barfoo", 1),
-                Line::new("bar", "barfoo", 2),
-                Line::new("foo", "barfoo", 3),
-                Line::new("bar", "foobar", 2),
-                Line::new("foobar", "foobar", 3)
-            ]
+            Vec::from_iter(
+                [
+                    Line::new("barfoo", "barfoo", 1),
+                    Line::new("bar", "barfoo", 2),
+                    Line::new("foo", "barfoo", 3),
+                    Line::new("bar", "foobar", 2),
+                    Line::new("foobar", "foobar", 3)
+                ]
+                .map(Rc::new)
+            )
         );
     }
 
     #[test]
     fn test_line_slice() {
-        let foobar = Line::new("foobar", "foobar", 1);
-        let foo = LineSlice::new(&foobar, 0, 3);
-        let bar = LineSlice::new(&foobar, 3, 6);
-        let f = LineSlice::new(&foobar, 0, 1);
-        let none = LineSlice::new(&foobar, 3, 3);
-        let all = LineSlice::new(&foobar, 0, 6);
-        let end = LineSlice::new(&foobar, 6, 6);
+        let foobar = Rc::new(Line::new("foobar", "foobar", 1));
+        let foo = LineSlice::new(foobar.clone(), 0, 3);
+        let bar = LineSlice::new(foobar.clone(), 3, 6);
+        let f = LineSlice::new(foobar.clone(), 0, 1);
+        let none = LineSlice::new(foobar.clone(), 3, 3);
+        let all = LineSlice::new(foobar.clone(), 0, 6);
+        let end = LineSlice::new(foobar.clone(), 6, 6);
 
         assert_eq!(foo.text(), "foo");
         assert_eq!(bar.text(), "bar");
@@ -272,8 +275,8 @@ mod tests {
 
     #[test]
     fn test_pos() {
-        let foo = Line::new("foobar", "foo", 11);
-        let bar = LineSlice::new(&foo, 3, 6);
+        let foo = Rc::new(Line::new("foobar", "foo", 11));
+        let bar = LineSlice::new(foo.clone(), 3, 6);
         assert_eq!(&foo.pos(), "foo:11");
         assert_eq!(&bar.pos(), "foo:11:4");
     }

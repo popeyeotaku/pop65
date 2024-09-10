@@ -1,15 +1,17 @@
 //! Expression tree enums.
 
+use std::rc::Rc;
+
 use crate::{asm::Assembler, source::LineSlice};
 
 /// A single expression tree node.
 pub struct ExprNode {
     pub label: ExLab,
-    pub slice: LineSlice,
+    pub slice: Rc<LineSlice>,
 }
 
 impl ExprNode {
-    pub fn new(label: ExLab, slice: LineSlice) -> Box<Self> {
+    pub fn new(label: ExLab, slice: Rc<LineSlice>) -> Box<Self> {
         Box::new(Self { label, slice })
     }
 }
@@ -35,7 +37,7 @@ impl ExprNode {
     pub fn eval(&self, asm: &mut Assembler) -> Result<u16, String> {
         match &self.label {
             ExLab::Name => {
-                let sym = asm.lookup(self.slice.text(), &self.slice);
+                let sym = asm.lookup(self.slice.text(), self.slice.clone());
                 if let Some(value) = sym.value {
                     Ok(value)
                 } else {
@@ -64,6 +66,8 @@ impl ExprNode {
 
 #[cfg(test)]
 mod tests {
+    use std::rc::Rc;
+
     use crate::{
         asm::Assembler,
         parse::LineChars,
@@ -74,7 +78,7 @@ mod tests {
     fn test_expr_parse_eval() {
         let text = "(1 + 2) * 3 - 4";
         let mut asm = Assembler::new(source::from_str(text, "text"));
-        let line = Line::new(text, "text", 1);
+        let line = Rc::new(Line::new(text, "text", 1));
         let e = asm
             .parse_expr(&mut LineChars::new(&line).peekable())
             .unwrap();

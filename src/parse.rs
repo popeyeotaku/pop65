@@ -2,6 +2,7 @@
 
 use std::{
     iter::{Enumerate, Peekable},
+    rc::Rc,
     str::Chars,
 };
 
@@ -15,19 +16,19 @@ use crate::{
 };
 
 pub struct ParsedLine {
-    pub label: Option<Box<LineSlice>>,
+    pub label: Option<Rc<LineSlice>>,
     pub action: Option<Box<dyn Action>>,
-    pub comment: Option<Box<LineSlice>>,
+    pub comment: Option<Rc<LineSlice>>,
 }
 
 /// Allows searching through individual characters in a line.
 pub struct LineChars<'a> {
-    line: &'a Line,
+    line: &'a Rc<Line>,
     chars: Enumerate<Chars<'a>>,
 }
 
 impl<'a> LineChars<'a> {
-    pub fn new(line: &'a Line) -> Self {
+    pub fn new(line: &'a Rc<Line>) -> Self {
         Self {
             line,
             chars: line.text.chars().enumerate(),
@@ -36,13 +37,17 @@ impl<'a> LineChars<'a> {
 }
 
 impl<'a> Iterator for LineChars<'a> {
-    type Item = (char, LineSlice);
+    type Item = (char, Rc<LineSlice>);
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some((char_index, c)) = self.chars.next() {
             Some((
                 c,
-                self.line.slice(char_index as u16, (char_index as u16) + 1),
+                Rc::new(LineSlice::new(
+                    self.line.clone(),
+                    char_index as u16,
+                    (char_index as u16) + 1,
+                )),
             ))
         } else {
             None
@@ -52,12 +57,12 @@ impl<'a> Iterator for LineChars<'a> {
 
 impl Assembler {
     /// Parse a single line of input. Return the label (if any), opcode/pseudo-op (if any), and comment (if any).
-    pub fn parse_line(&mut self, line: &Line) -> Result<ParsedLine, String> {
-        let mut chars = LineChars::new(line).peekable();
+    pub fn parse_line(&mut self, line: Rc<Line>) -> Result<ParsedLine, String> {
+        let mut chars = LineChars::new(&line).peekable();
 
-        let label = self.parse_label(&mut chars)?.map(Box::new);
+        let label = self.parse_label(&mut chars)?;
         let action = self.parse_action(&mut chars)?;
-        let comment = self.parse_comment(&mut chars)?.map(Box::new);
+        let comment = self.parse_comment(&mut chars)?;
 
         self.skip_ws(&mut chars);
         if let Some((_, pos)) = chars.next() {
@@ -86,7 +91,7 @@ impl Assembler {
     fn parse_label(
         &mut self,
         chars: &mut Peekable<LineChars>,
-    ) -> Result<Option<LineSlice>, String> {
+    ) -> Result<Option<Rc<LineSlice>>, String> {
         if let Some(name) = self.parse_name(chars) {
             let opchk = name.text().to_ascii_lowercase();
             if find_op(opchk.as_str()).is_some() {
@@ -100,7 +105,7 @@ impl Assembler {
     }
 
     /// Grab a leading Name, if any.
-    fn parse_name(&mut self, chars: &mut Peekable<LineChars>) -> Option<LineSlice> {
+    fn parse_name(&mut self, chars: &mut Peekable<LineChars>) -> Option<Rc<LineSlice>> {
         if let Some((c, start)) = chars.peek().cloned() {
             if c.is_ascii_alphabetic() {
                 chars.next();
@@ -112,7 +117,7 @@ impl Assembler {
                     end = new_end.end_char;
                     chars.next();
                 }
-                Some(start.with_end(end))
+                Some(Rc::new(start.with_end(end)))
             } else {
                 None
             }
@@ -163,11 +168,11 @@ impl Assembler {
     /// Parse a psuedo-op.
     fn parse_pseudo(
         &mut self,
-        start: LineSlice,
+        start: Rc<LineSlice>,
         chars: &mut Peekable<LineChars>,
     ) -> Result<Box<dyn Action>, String> {
         if let Some(name) = self.parse_name(chars) {
-            let name = start.join(&name);
+            let name = Rc::new(start.join(&name));
             if self.at_eol(chars) {
                 Ok(Box::new(PseudoOp::new(name, Vec::new())))
             } else {
@@ -189,7 +194,7 @@ impl Assembler {
     /// Parse an opcode.
     fn parse_opcode(
         &mut self,
-        opcode: LineSlice,
+        opcode: Rc<LineSlice>,
         chars: &mut Peekable<LineChars>,
     ) -> Result<Box<dyn Action>, String> {
         let op_name = opcode.text().to_ascii_lowercase();
@@ -211,7 +216,7 @@ impl Assembler {
             if let Some((_, slice)) = chars.peek() {
                 slice.clone()
             } else {
-                self.cur_line.as_ref().unwrap().slice(0, 0)
+                Rc::new(LineSlice::new(self.cur_line.clone().unwrap(), 0, 0))
             }
         };
         if let Some((c, _)) = chars.peek() {
@@ -305,12 +310,12 @@ impl Assembler {
     fn parse_comment(
         &mut self,
         chars: &mut Peekable<LineChars>,
-    ) -> Result<Option<LineSlice>, String> {
+    ) -> Result<Option<Rc<LineSlice>>, String> {
         self.skip_ws(chars);
         if let Some((c, start)) = chars.peek().cloned() {
             if c == ';' {
                 if let Some((_, end)) = chars.last() {
-                    Ok(Some(start.join(&end)))
+                    Ok(Some(Rc::new(start.join(&end))))
                 } else {
                     Ok(Some(start))
                 }
@@ -327,34 +332,42 @@ mod expr;
 
 #[cfg(test)]
 mod tests {
+    use std::rc::Rc;
+
     use crate::{
         asm::Assembler,
         parse::LineChars,
-        source::{self, Line},
+        source::{self, Line, LineSlice},
     };
 
     #[test]
     fn test_parse_name() {
         let test = source::from_str("foo\nbar foobar\n\nfoobar\n", "foobar");
-        let foo = Line::new("foo", "foobar", 1);
-        let bar = Line::new("bar foobar", "foobar", 2);
-        let bl = Line::new("", "foobar", 3);
-        let foobar = Line::new("foobar", "foobar", 4);
+        let foo = Rc::new(Line::new("foo", "foobar", 1));
+        let bar = Rc::new(Line::new("bar foobar", "foobar", 2));
+        let bl = Rc::new(Line::new("", "foobar", 3));
+        let foobar = Rc::new(Line::new("foobar", "foobar", 4));
         let mut asm = Assembler::new(test);
 
         assert_eq!(
             asm.parse_name(&mut LineChars::new(&foo).peekable()),
-            Some(foo.slice(0, 3))
+            Some(Rc::new(LineSlice::new(foo.clone(), 0, 3)))
         );
         let mut bar_chars = LineChars::new(&bar).peekable();
-        assert_eq!(asm.parse_name(&mut bar_chars), Some(bar.slice(0, 3)));
+        assert_eq!(
+            asm.parse_name(&mut bar_chars),
+            Some(Rc::new(LineSlice::new(bar.clone(), 0, 3)))
+        );
         assert_eq!(asm.parse_name(&mut bar_chars), None);
         assert!(bar_chars.next().is_some());
-        assert_eq!(asm.parse_name(&mut bar_chars), Some(bar.slice(4, 4 + 6)));
+        assert_eq!(
+            asm.parse_name(&mut bar_chars),
+            Some(Rc::new(LineSlice::new(bar.clone(), 4, 4 + 6)))
+        );
         assert_eq!(asm.parse_name(&mut LineChars::new(&bl).peekable()), None);
         assert_eq!(
             asm.parse_name(&mut LineChars::new(&foobar).peekable()),
-            Some(foobar.slice(0, 6))
+            Some(Rc::new(LineSlice::new(foobar, 0, 6)))
         );
     }
 }

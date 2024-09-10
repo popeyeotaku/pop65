@@ -1,6 +1,6 @@
 //! Support for asm symbols.
 
-use std::{collections::HashSet, fmt::Display};
+use std::{collections::HashSet, fmt::Display, rc::Rc};
 
 use crate::source::LineSlice;
 
@@ -9,8 +9,8 @@ use crate::source::LineSlice;
 pub struct Symbol {
     name: String,
     pub value: Option<u16>,
-    pub defined_at: Option<LineSlice>,
-    references: HashSet<LineSlice>,
+    pub defined_at: Option<Rc<LineSlice>>,
+    references: HashSet<Rc<LineSlice>>,
 }
 
 impl PartialEq for Symbol {
@@ -54,9 +54,9 @@ impl Display for Symbol {
 }
 
 impl Symbol {
-    pub fn new(name: &str, first_ref: &LineSlice) -> Box<Self> {
+    pub fn new(name: &str, first_ref: Rc<LineSlice>) -> Box<Self> {
         let mut refs = HashSet::with_capacity(1);
-        refs.insert(first_ref.clone());
+        refs.insert(first_ref);
         Box::new(Self {
             name: name.to_string(),
             value: None,
@@ -68,12 +68,12 @@ impl Symbol {
     /// Add a new reference to this symbol.
     ///
     /// Returns `true` if the reference was already in the list.
-    pub fn add_ref(&mut self, ref_slice: &LineSlice) -> bool {
-        self.references.insert(ref_slice.clone())
+    pub fn add_ref(&mut self, ref_slice: Rc<LineSlice>) -> bool {
+        self.references.insert(ref_slice)
     }
 
     /// Try to define the value of this symbol; error if we're redefined.
-    pub fn define(&mut self, value: u16, defined_at: &LineSlice) -> Result<(), String> {
+    pub fn define(&mut self, value: u16, defined_at: Rc<LineSlice>) -> Result<(), String> {
         if self.value.is_none() {
             debug_assert!(self.defined_at.is_none());
             self.value = Some(value);

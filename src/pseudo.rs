@@ -1,5 +1,7 @@
 //! Pseudo-Op support.
 
+use std::rc::Rc;
+
 use crate::{
     action::Action,
     asm::Assembler,
@@ -9,15 +11,21 @@ use crate::{
 
 /// Indicates a pseudo-op.
 pub struct PseudoOp {
-    op_name: LineSlice,
+    op_name: Rc<LineSlice>,
+    op_name_lcase: String,
     #[allow(clippy::vec_box)]
     args: Vec<Box<ExprNode>>,
 }
 
 impl PseudoOp {
     #[allow(clippy::vec_box)]
-    pub fn new(op_name: LineSlice, args: Vec<Box<ExprNode>>) -> Self {
-        Self { op_name, args }
+    pub fn new(op_name: Rc<LineSlice>, args: Vec<Box<ExprNode>>) -> Self {
+        let op_name_lcase = op_name.clone().text().to_ascii_lowercase();
+        Self {
+            op_name,
+            args,
+            op_name_lcase,
+        }
     }
 
     fn arg_count_err<T>(&self) -> Result<T, String> {
@@ -38,10 +46,9 @@ impl Action for PseudoOp {
     fn pass1(
         &self,
         assembler: &mut Assembler,
-        label: &Option<Box<LineSlice>>,
+        label: Option<Rc<LineSlice>>,
     ) -> Result<u16, String> {
-        let name = self.op_name.text().to_ascii_lowercase();
-        match name.as_str() {
+        match self.op_name_lcase.as_str() {
             ".inc" | ".lib" | ".fil" => {
                 for arg in &self.args {
                     if let Some(path) = Self::is_str_arg(arg) {
@@ -65,8 +72,8 @@ impl Action for PseudoOp {
                 }
                 if let Some(label) = label {
                     let value = Some(self.args[0].eval(assembler)?);
-                    let sym = assembler.lookup(label.text(), label);
-                    sym.defined_at = Some(*label.clone());
+                    let sym = assembler.lookup(label.clone().text(), label.clone());
+                    sym.defined_at = Some(label);
                     sym.value = value;
                     Ok(0)
                 } else {
@@ -101,11 +108,10 @@ impl Action for PseudoOp {
     }
 
     fn pass2(&self, assembler: &mut Assembler) -> Result<Vec<u8>, String> {
-        let name = self.op_name.text().to_ascii_lowercase();
-        match name.as_str() {
+        match self.op_name_lcase.as_str() {
             ".inc" | ".lib" | ".fil" => Ok(vec![]),
             "=" => Ok(vec![]),
-            ".org" => self.pass1(assembler, &None).map(|_| vec![]),
+            ".org" => self.pass1(assembler, None).map(|_| vec![]),
             ".byte" => {
                 let mut bytes = Vec::with_capacity(self.args.len());
                 for arg in &self.args {
@@ -124,13 +130,13 @@ impl Action for PseudoOp {
                 }
                 Ok(bytes)
             }
-            _ => self.pass1(assembler, &None).map(|_| vec![]),
+            _ => self.pass1(assembler, None).map(|_| vec![]),
         }
     }
 
-    fn line_slice(&self) -> LineSlice {
+    fn line_slice(&self) -> Rc<LineSlice> {
         if let Some(last_arg) = self.args.last() {
-            self.op_name.join(&last_arg.slice)
+            Rc::new(self.op_name.join(&last_arg.slice))
         } else {
             self.op_name.clone()
         }
