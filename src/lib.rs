@@ -37,4 +37,41 @@ mod tests {
             Ok(vec![0x18, 0x00, 0xbd, 0x34, 0x12, 0x4C, 0x01, 0x00])
         );
     }
+
+    #[test]
+    fn test_c64_hello() {
+        let src = "
+        .org 0
+        .word $801
+        .org $801
+bashed  .word bashe1
+        .word 10
+        .byte $9E,'2061',0
+bashe1  .word 0
+        jmp start
+chrout  = $ffd2
+point1  = $fb
+msg     .byte 13,13,'hello world',13,13,0
+start   lda #<msg
+        sta point1
+        lda #>msg
+        sta point1+1
+        jsr print
+        jmp *
+print   ldy #0
+print1  lda (point1),y
+        beq print2
+        jsr chrout
+        iny
+        bne print1
+print2  rts";
+        assert_eq!(
+            assemble_str(src, "src"),
+            Ok(vec![
+                1, 8, 11, 8, 10, 0, 158, 50, 48, 54, 49, 0, 0, 0, 76, 32, 8, 13, 13, 72, 69, 76,
+                76, 79, 32, 87, 79, 82, 76, 68, 13, 13, 0, 169, 16, 133, 251, 169, 8, 133, 252, 32,
+                46, 8, 76, 43, 8, 160, 0, 177, 251, 240, 6, 32, 210, 255, 200, 208, 246, 96
+            ])
+        )
+    }
 }
