@@ -23,3 +23,4 @@ print1  lda (point1),y
         iny
         bne print1
 print2  rts
+end
