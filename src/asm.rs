@@ -16,9 +16,9 @@ pub enum Pass {
 }
 
 pub struct Assembler {
-    src_stk: Box<SrcStack>,
+    pub src_stk: Box<SrcStack>,
     parsed_lines: Vec<ParsedLine>,
-    pass: Pass,
+    pub pass: Pass,
     pub symtab: HashMap<String, Box<Symbol>>,
     pub program_counter: Option<u16>,
     pub cur_line: Option<Line>,

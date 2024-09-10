@@ -86,6 +86,6 @@ print2  rts";
     #[test]
     fn test_include() {
         let (bytes, _) = assemble(from_file("inc_test.s").unwrap()).unwrap();
-        assert_eq!(bytes, vec![0x36, 0x12, 0x12, 0x34])
+        assert_eq!(bytes, vec![0x36, 0x12, 0x34, 0x12])
     }
 }

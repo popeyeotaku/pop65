@@ -4,7 +4,7 @@ use crate::{
     action::Action,
     asm::Assembler,
     expr::{ExLab, ExprNode},
-    source::LineSlice,
+    source::{self, LineSlice},
 };
 
 /// Indicates a pseudo-op.
@@ -42,8 +42,22 @@ impl Action for PseudoOp {
     ) -> Result<u16, String> {
         let name = self.op_name.text().to_ascii_lowercase();
         match name.as_str() {
-            ".inc"|".lib"|".fil" => {
-                todo!()
+            ".inc" | ".lib" | ".fil" => {
+                for arg in &self.args {
+                    if let Some(path) = Self::is_str_arg(arg) {
+                        match source::from_file(path) {
+                            Ok(src) => assembler.src_stk.push(src),
+                            Err(e) => {
+                                return self
+                                    .line_slice()
+                                    .err(&format!("Error including '{}': {}", path, e))
+                            }
+                        }
+                    } else {
+                        return self.line_slice().err("Missing string for include path");
+                    }
+                }
+                Ok(0)
             }
             "=" => {
                 if self.args.len() != 1 {
@@ -89,6 +103,7 @@ impl Action for PseudoOp {
     fn pass2(&self, assembler: &mut Assembler) -> Result<Vec<u8>, String> {
         let name = self.op_name.text().to_ascii_lowercase();
         match name.as_str() {
+            ".inc" | ".lib" | ".fil" => Ok(vec![]),
             "=" => Ok(vec![]),
             ".org" => self.pass1(assembler, &None).map(|_| vec![]),
             ".byte" => {
