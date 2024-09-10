@@ -1,12 +1,12 @@
 use std::{error::Error, fs};
 
 use criterion::{criterion_group, criterion_main, Criterion};
-use pop65::{assemble, dump_symtab, from_file};
+use pop65::{assemble, from_file};
 
 fn test_s() -> Result<(), Box<dyn Error>> {
-    let (bytes, symbols) = assemble(from_file("test.s")?)?;
-    fs::write("test.prg", bytes)?;
-    fs::write("test.sym", dump_symtab(symbols))?;
+    let info = assemble(from_file("test.s")?)?;
+    fs::write("test.prg", &info.bytes)?;
+    fs::write("test.sym", info.dump_symtab())?;
     Ok(())
 }
 

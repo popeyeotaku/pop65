@@ -10,29 +10,40 @@ pub use symbol::Symbol;
 /// Assemble code from a source string.
 pub fn assemble_str(src: &str, path: &str) -> Result<Vec<u8>, String> {
     let src = source::from_str(src, path);
-    let (bytes, _) = assemble(src)?;
-    Ok(bytes)
+    let info = assemble(src)?;
+    Ok(info.bytes)
 }
 
-pub type SymTab = HashMap<String, Box<Symbol>>;
+/// The returned info from the assembler.
+pub struct AsmInfo {
+    pub bytes: Vec<u8>,
+    pub symtab: HashMap<String, Box<Symbol>>,
+    pub debug_str: String,
+}
+
+impl AsmInfo {
+    /// Dump the symbol table to a sorted string.
+    pub fn dump_symtab(&self) -> String {
+        let mut symstr = String::new();
+        let mut symbols = Vec::from_iter(self.symtab.values());
+        symbols.sort();
+        for symbol in symbols {
+            symstr.push_str(&format!("{}\n", symbol));
+        }
+        symstr
+    }
+}
 
 /// Assemble a source file.
-pub fn assemble(src: Source) -> Result<(Vec<u8>, SymTab), String> {
+pub fn assemble(src: Source) -> Result<AsmInfo, String> {
     let mut asm = Box::new(Assembler::new(src));
     asm.pass1()?;
     let bytes = asm.pass2()?;
-    Ok((bytes, mem::take(&mut asm.symtab)))
-}
-
-/// Dump the symbol table to a sorted string.
-pub fn dump_symtab(symtab: SymTab) -> String {
-    let mut symstr = String::new();
-    let mut symbols = Vec::from_iter(symtab.values());
-    symbols.sort();
-    for symbol in symbols {
-        symstr.push_str(&format!("{}\n", symbol));
-    }
-    symstr
+    Ok(AsmInfo {
+        bytes,
+        symtab: mem::take(&mut asm.symtab),
+        debug_str: mem::take(&mut asm.debug_str),
+    })
 }
 
 mod action;
@@ -96,7 +107,7 @@ print2  rts";
 
     #[test]
     fn test_include() {
-        let (bytes, _) = assemble(from_file("inc_test.s").unwrap()).unwrap();
-        assert_eq!(bytes, vec![0x36, 0x12, 0x34, 0x12])
+        let info = assemble(from_file("inc_test.s").unwrap()).unwrap();
+        assert_eq!(info.bytes, vec![0x36, 0x12, 0x34, 0x12])
     }
 }

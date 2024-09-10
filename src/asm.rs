@@ -18,6 +18,7 @@ pub enum Pass {
 pub struct Assembler {
     pub src_stk: Box<SrcStack>,
     parsed_lines: Vec<ParsedLine>,
+    pub debug_str: String,
     pub pass: Pass,
     pub symtab: HashMap<String, Box<Symbol>>,
     pub program_counter: Option<u16>,
@@ -33,6 +34,7 @@ impl Assembler {
             parsed_lines: Vec::new(),
             pass: Pass::None,
             cur_line: None,
+            debug_str: String::new(),
         }
     }
 

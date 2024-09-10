@@ -1,14 +1,14 @@
 use std::{error::Error, fs};
 
 use clap::Parser;
-use pop65::{assemble, dump_symtab};
+use pop65::assemble;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();
-    let (bytes, symtab) = assemble(pop65::from_file(&cli.source)?)?;
-    fs::write(cli.output, bytes)?;
-    if let Some(sympath) = cli.symbols {
-        let symstr = dump_symtab(symtab);
+    let info = assemble(pop65::from_file(&cli.source)?)?;
+    fs::write(cli.output, &info.bytes)?;
+    if let Some(sympath) = cli.symbol_file {
+        let symstr = info.dump_symtab();
         fs::write(sympath, symstr)?;
     }
     Ok(())
@@ -23,5 +23,8 @@ struct Cli {
     output: String,
 
     #[arg(short, long)]
-    symbols: Option<String>,
+    symbol_file: Option<String>,
+
+    #[arg(short, long)]
+    debug_file: Option<String>,
 }
