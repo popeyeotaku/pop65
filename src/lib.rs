@@ -35,7 +35,7 @@ mod symbol;
 
 #[cfg(test)]
 mod tests {
-    use crate::assemble_str;
+    use crate::{assemble, assemble_str, from_file};
 
     #[test]
     fn test_asm_str() {
@@ -81,5 +81,11 @@ print2  rts";
                 46, 8, 76, 43, 8, 160, 0, 177, 251, 240, 6, 32, 210, 255, 200, 208, 246, 96
             ])
         )
+    }
+
+    #[test]
+    fn test_include() {
+        let (bytes, _) = assemble(from_file("inc_test.s").unwrap()).unwrap();
+        assert_eq!(bytes, vec![0x36, 0x12, 0x12, 0x34])
     }
 }

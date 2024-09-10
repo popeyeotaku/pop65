@@ -42,6 +42,9 @@ impl Action for PseudoOp {
     ) -> Result<u16, String> {
         let name = self.op_name.text().to_ascii_lowercase();
         match name.as_str() {
+            ".inc"|".lib"|".fil" => {
+                todo!()
+            }
             "=" => {
                 if self.args.len() != 1 {
                     return self.arg_count_err();
