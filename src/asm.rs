@@ -26,6 +26,7 @@ pub struct Assembler {
     pub program_counter: Option<u16>,
     pub cur_line: Option<Rc<Line>>,
     building_comment: Option<String>,
+    errcount: u32,
 }
 
 impl Assembler {
@@ -40,7 +41,41 @@ impl Assembler {
             debug_str: String::new(),
             debug_fmt: None,
             building_comment: None,
+            errcount: 0,
         }
+    }
+
+    /// Run pass1 for a single line.
+    fn pass1_line(&mut self, line: Rc<Line>) -> Result<(), String> {
+        self.cur_line = Some(line.clone());
+        let parsed = self.parse_line(line.clone())?;
+        let comment = parsed.filter_comment();
+        if let Some(label_slice) = &parsed.label {
+            let comment_label = {
+                if let Some(s) = self.building_comment.take() {
+                    Some(s)
+                } else {
+                    comment.map(String::from)
+                }
+            };
+            self.def_label(label_slice.text(), label_slice.clone(), comment_label)?;
+        }
+        if let Some(action) = &parsed.action {
+            let size = action.pass1(self, parsed.label.clone())?;
+            self.pc_add(size)?;
+        }
+        if let Some(c) = comment {
+            if parsed.label.is_none() && parsed.action.is_none() {
+                let s = self.building_comment.get_or_insert_with(String::new);
+                s.push_str(c);
+                s.push('\n');
+            }
+        }
+        if parsed.label.is_some() || parsed.action.is_some() {
+            self.building_comment = None;
+        }
+        self.parsed_lines.push(parsed);
+        Ok(())
     }
 
     /// Read the entire source, constructing the symbol table.
@@ -51,54 +86,48 @@ impl Assembler {
         self.program_counter = None;
 
         while let Some(line) = self.src_stk.next() {
-            self.cur_line = Some(line.clone());
-            let parsed = self.parse_line(line.clone())?;
-            let comment = parsed.filter_comment();
-            if let Some(label_slice) = &parsed.label {
-                let comment_label = {
-                    if let Some(s) = self.building_comment.take() {
-                        Some(s)
-                    } else {
-                        comment.map(String::from)
-                    }
-                };
-                self.def_label(label_slice.text(), label_slice.clone(), comment_label)?;
+            if let Err(msg) = self.pass1_line(line) {
+                eprintln!("{}", msg);
+                self.errcount += 1;
             }
-            if let Some(action) = &parsed.action {
-                let size = action.pass1(self, parsed.label.clone())?;
-                self.pc_add(size)?;
-            }
-            if let Some(c) = comment {
-                if parsed.label.is_none() && parsed.action.is_none() {
-                    let s = self.building_comment.get_or_insert_with(String::new);
-                    s.push_str(c);
-                    s.push('\n');
-                }
-            }
-            if parsed.label.is_some() || parsed.action.is_some() {
-                self.building_comment = None;
-            }
-            self.parsed_lines.push(parsed);
+        }
+        if self.errcount == 0 {
+            Ok(())
+        } else {
+            Err(format!("{} errors in pass 1", self.errcount))
+        }
+    }
+
+    /// Handle a single line in pass2.
+    fn pass2_line(&mut self, line: &ParsedLine, output: &mut Vec<u8>) -> Result<(), String> {
+        if let Some(action) = &line.action {
+            let new_bytes = action.pass2(self)?;
+            self.pc_add(new_bytes.len() as u16)?;
+            output.extend(new_bytes);
         }
         Ok(())
     }
 
     /// Final assembly.
     pub fn pass2(&mut self) -> Result<Vec<u8>, String> {
+        assert!(self.errcount == 0);
         self.program_counter = None;
         self.pass = Pass::Pass2;
         let mut output: Vec<u8> = Vec::with_capacity((u16::MAX as usize) + 1);
         let lines = mem::take(&mut self.parsed_lines);
 
         for parsed_line in &lines {
-            if let Some(action) = &parsed_line.action {
-                let new_bytes = action.pass2(self)?;
-                self.pc_add(new_bytes.len() as u16)?;
-                output.extend(new_bytes);
+            if let Err(msg) = self.pass2_line(parsed_line, &mut output) {
+                eprintln!("{}", msg);
+                self.errcount += 1;
             }
         }
 
-        Ok(output)
+        if self.errcount == 0 {
+            Ok(output)
+        } else {
+            Err(format!("{} errors in pass 2", self.errcount))
+        }
     }
 
     /// Add a value to the current PC.
