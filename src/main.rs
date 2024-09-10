@@ -11,6 +11,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         let symstr = info.dump_symtab();
         fs::write(sympath, symstr)?;
     }
+    if let Some(dbgpath) = cli.debug_file {
+        fs::write(dbgpath, &info.debug_str)?;
+    }
     Ok(())
 }
 

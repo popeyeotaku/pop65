@@ -12,6 +12,3 @@ criterion = "0.5.1"
 [[bench]]
 name = "test_s"
 harness = false
-
-[profile.release]
-debug = 1

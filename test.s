@@ -1,4 +1,5 @@
         .org 0
+        .dbg "al ${V} .{L}"
         .word $801
         .org $801
 bashed  .word bashe1
