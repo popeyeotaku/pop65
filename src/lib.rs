@@ -57,7 +57,7 @@ mod symbol;
 
 #[cfg(test)]
 mod tests {
-    use crate::{assemble, assemble_str, from_file};
+    use crate::{assemble, assemble_str, from_file, source};
 
     #[test]
     fn test_asm_str() {
@@ -109,5 +109,17 @@ print2  rts";
     fn test_include() {
         let info = assemble(from_file("inc_test.s").unwrap()).unwrap();
         assert_eq!(info.bytes, vec![0x36, 0x12, 0x34, 0x12])
+    }
+
+    #[test]
+    fn test_dbg() {
+        let src = "
+        .org $8000
+        .dbg \"P:{VC000}:{L}\"
+foo     .word foo";
+        let info = assemble(source::from_str(src, "src")).unwrap();
+        assert_eq!(&info.bytes, &vec![0x00, 0x80]);
+        assert_eq!(info.symtab["foo"].value, Some(0x8000));
+        assert_eq!(&info.debug_str, "P:14000:foo");
     }
 }

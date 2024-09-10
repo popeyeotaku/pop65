@@ -9,6 +9,7 @@ use crate::{
 };
 
 /// Represents the current assembly pass.
+#[derive(PartialEq)]
 pub enum Pass {
     None,
     Pass1,
@@ -91,17 +92,15 @@ impl Assembler {
     }
 
     /// Output a debug info string.
-    fn debug_label(&mut self, label:&str, value:u16) -> Result<(), String> {
+    fn debug_label(&mut self, label: &str, value: u16) -> Result<(), String> {
         todo!()
     }
 
     /// Define a new label at the current PC, complaining if it was redefined.
     pub fn def_label(&mut self, label: &str, slice: Rc<LineSlice>) -> Result<(), String> {
         let pc = *self.pc()?;
-        if self.pass == Pass::Pass1 {
-            if let Some(f) = &self.debug_fmt {
-                self.debug_label(label, pc)?
-            }
+        if self.pass == Pass::Pass1 && self.debug_fmt.is_some() {
+            self.debug_label(label, pc)?
         }
         self.def_symbol(label, slice, pc)
     }
