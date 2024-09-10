@@ -92,15 +92,52 @@ impl Assembler {
     }
 
     /// Output a debug info string.
-    fn debug_label(&mut self, label: &str, value: u16) -> Result<(), String> {
-        todo!()
+    fn debug_label(&mut self, label: &str, slice: Rc<LineSlice>, value: u16) -> Result<(), String> {
+        if let Some(f) = &self.debug_fmt {
+            let mut chars = f.chars();
+            while let Some(c) = chars.next() {
+                if c == '{' {
+                    match chars.next() {
+                        Some('V') => {
+                            let mut starting_offset: u32 = 0;
+                            for c in chars.by_ref() {
+                                if c == '}' {
+                                    break;
+                                } else if let Some(digit) = c.to_digit(16) {
+                                    starting_offset = starting_offset * 16 + digit;
+                                } else {
+                                    return slice.err("bad debug format string");
+                                }
+                            }
+                            self.debug_str
+                                .push_str(&format!("{:X}", starting_offset + (value as u32)));
+                        }
+                        Some('L') => {
+                            if chars.next() != Some('}') {
+                                return slice.err("bad debug format string");
+                            }
+                            self.debug_str.push_str(label);
+                        }
+                        _ => {
+                            return slice.err("bad dbg format string");
+                        }
+                    }
+                } else {
+                    self.debug_str.push(c);
+                }
+            }
+            self.debug_str.push('\n');
+            Ok(())
+        } else {
+            panic!()
+        }
     }
 
     /// Define a new label at the current PC, complaining if it was redefined.
     pub fn def_label(&mut self, label: &str, slice: Rc<LineSlice>) -> Result<(), String> {
         let pc = *self.pc()?;
         if self.pass == Pass::Pass1 && self.debug_fmt.is_some() {
-            self.debug_label(label, pc)?
+            self.debug_label(label, slice.clone(), pc)?
         }
         self.def_symbol(label, slice, pc)
     }

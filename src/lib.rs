@@ -120,6 +120,6 @@ foo     .word foo";
         let info = assemble(source::from_str(src, "src")).unwrap();
         assert_eq!(&info.bytes, &vec![0x00, 0x80]);
         assert_eq!(info.symtab["foo"].value, Some(0x8000));
-        assert_eq!(&info.debug_str, "P:14000:foo");
+        assert_eq!(&info.debug_str, "P:14000:foo\n");
     }
 }
