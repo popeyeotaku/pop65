@@ -49,6 +49,19 @@ impl Action for PseudoOp {
         label: Option<Rc<LineSlice>>,
     ) -> Result<u16, String> {
         match self.op_name_lcase.as_str() {
+            ".dbg" => {
+                if self.args.is_empty() {
+                    assembler.debug_fmt = None;
+                    Ok(0)
+                } else if self.args.len() != 1 {
+                    self.arg_count_err()
+                } else if let Some(s) = Self::is_str_arg(&self.args[0]) {
+                    assembler.debug_fmt = Some(s.to_string());
+                    Ok(0)
+                } else {
+                    self.line_slice().err("expected string argument")
+                }
+            }
             ".inc" | ".lib" | ".fil" => {
                 for arg in &self.args {
                     if let Some(path) = Self::is_str_arg(arg) {

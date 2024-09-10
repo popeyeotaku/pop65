@@ -19,6 +19,7 @@ pub struct Assembler {
     pub src_stk: Box<SrcStack>,
     parsed_lines: Vec<ParsedLine>,
     pub debug_str: String,
+    pub debug_fmt: Option<String>,
     pub pass: Pass,
     pub symtab: HashMap<String, Box<Symbol>>,
     pub program_counter: Option<u16>,
@@ -35,6 +36,7 @@ impl Assembler {
             pass: Pass::None,
             cur_line: None,
             debug_str: String::new(),
+            debug_fmt: None,
         }
     }
 
@@ -88,9 +90,19 @@ impl Assembler {
         }
     }
 
+    /// Output a debug info string.
+    fn debug_label(&mut self, label:&str, value:u16) -> Result<(), String> {
+        todo!()
+    }
+
     /// Define a new label at the current PC, complaining if it was redefined.
     pub fn def_label(&mut self, label: &str, slice: Rc<LineSlice>) -> Result<(), String> {
         let pc = *self.pc()?;
+        if self.pass == Pass::Pass1 {
+            if let Some(f) = &self.debug_fmt {
+                self.debug_label(label, pc)?
+            }
+        }
         self.def_symbol(label, slice, pc)
     }
 
