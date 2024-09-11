@@ -110,6 +110,11 @@ impl Assembler {
         chars: &mut Peekable<LineChars>,
     ) -> Result<Option<Rc<LineSlice>>, String> {
         if let Some(name) = self.parse_name(chars) {
+            if let Some((c, _)) = chars.peek() {
+                if *c == ':' {
+                    chars.next();
+                }
+            }
             let opchk = name.text().to_ascii_lowercase();
             if find_op(opchk.as_str()).is_some() {
                 Ok(None)

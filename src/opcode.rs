@@ -53,7 +53,7 @@ impl AMode {
             AMode::Abs => 3,
             AMode::AbsX => 3,
             AMode::AbsY => 3,
-            AMode::Ind => 2,
+            AMode::Ind => 3,
             AMode::IndX => 2,
             AMode::IndY => 2,
             AMode::Rel => 2,
@@ -345,7 +345,7 @@ impl OpCode {
     fn is_zp(&self, asm: &mut Assembler) -> bool {
         if let Some(expr) = self.expr.as_ref() {
             if let Ok(val) = expr.eval(asm) {
-                if val <= u8::MAX as u16 {
+                if val <= (u8::MAX as u16) {
                     return true;
                 }
             }
@@ -364,7 +364,7 @@ impl OpCode {
             AMode::Abs => {
                 if self.op.op_bytes.contains_key(&AMode::Rel) {
                     AMode::Rel
-                } else if self.op.op_bytes.contains_key(&AMode::ZpX) && self.is_zp(asm) {
+                } else if self.op.op_bytes.contains_key(&AMode::Zp) && self.is_zp(asm) {
                     AMode::Zp
                 } else {
                     AMode::Abs

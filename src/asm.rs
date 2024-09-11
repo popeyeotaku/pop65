@@ -132,12 +132,9 @@ impl Assembler {
 
     /// Add a value to the current PC.
     pub fn pc_add(&mut self, offset: u16) -> Result<(), String> {
-        if let Some(new_pc) = self.pc()?.checked_add(offset) {
-            *self.pc()? = new_pc;
-            Ok(())
-        } else {
-            self.cur_line.as_ref().unwrap().err("PC overflow")
-        }
+        let pc = self.pc()?;
+        *pc = pc.wrapping_add(offset);
+        Ok(())
     }
 
     /// Output a debug info string.
