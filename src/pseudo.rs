@@ -87,7 +87,7 @@ impl Action for PseudoOp {
                 }
                 Ok(0)
             }
-            "="|".equ" => {
+            "=" | ".equ" => {
                 if self.args.len() != 1 {
                     return self.arg_count_err();
                 }
@@ -151,7 +151,7 @@ impl Action for PseudoOp {
                 }
             }
             ".inc" | ".lib" | ".fil" => Ok(vec![]),
-            "="|".equ" => Ok(vec![]),
+            "=" | ".equ" => Ok(vec![]),
             ".org" => self.pass1(assembler, None).map(|_| vec![]),
             ".byte" => {
                 let mut bytes = Vec::with_capacity(self.args.len());
@@ -184,9 +184,6 @@ impl Action for PseudoOp {
     }
 
     fn is_equ(&self) -> bool {
-        match self.op_name_lcase.as_str() {
-            "=" | ".equ" => true,
-            _ => false,
-        }
+        matches!(self.op_name_lcase.as_str(), "=" | ".equ")
     }
 }
