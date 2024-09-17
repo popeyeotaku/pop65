@@ -172,17 +172,32 @@ impl Assembler {
                         }
                         Some('V') => {
                             let mut starting_offset: u32 = 0;
-                            for c in chars.by_ref() {
+                            let mut wrapped_c = chars.next();
+                            let neg_flag = {
+                                if wrapped_c == Some('-') {
+                                    wrapped_c = chars.next();
+                                    true
+                                } else {
+                                    false
+                                }
+                            };
+                            while let Some(c) = wrapped_c {
                                 if c == '}' {
                                     break;
                                 } else if let Some(digit) = c.to_digit(16) {
+                                    wrapped_c = chars.next();
                                     starting_offset = starting_offset * 16 + digit;
                                 } else {
                                     return slice.err("bad debug format string");
                                 }
                             }
-                            self.debug_str
-                                .push_str(&format!("{:X}", starting_offset + (value as u32)));
+                            if neg_flag {
+                                starting_offset = starting_offset.wrapping_neg();
+                            }
+                            self.debug_str.push_str(&format!(
+                                "{:X}",
+                                starting_offset.wrapping_add(value as u32)
+                            ));
                         }
                         Some('L') => {
                             if chars.next() != Some('}') {
@@ -334,5 +349,15 @@ bar     .equ foo*2
         assert!(result.debug_str.is_empty());
         assert_eq!(result.symtab["foo"].value, Some(1234));
         assert_eq!(result.symtab["bar"].value, Some(2468));
+    }
+
+    #[test]
+    fn test_neg_dbg() {
+        let src = "
+        .org $1234
+        .dbg '{L}:{V-1000}'
+foo     .word foo";
+        let info = assemble(source::from_str(src, src)).unwrap();
+        assert_eq!(info.debug_str.as_str(), "foo:234\n");
     }
 }
