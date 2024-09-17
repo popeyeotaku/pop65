@@ -120,6 +120,8 @@ impl Action for PseudoOp {
                 Ok(sum)
             }
             ".word" => Ok((self.args.len() * 2) as u16),
+            ".off" => Ok(0),
+            ".on" => Ok(0),
             _ => self
                 .line_slice()
                 .err(&format!("bad pseudo-op '{}'", self.op_name.text())),
@@ -128,6 +130,14 @@ impl Action for PseudoOp {
 
     fn pass2(&self, assembler: &mut Assembler) -> Result<Vec<u8>, String> {
         match self.op_name_lcase.as_str() {
+            ".on" => {
+                assembler.output_flag = true;
+                Ok(vec![])
+            }
+            ".off" => {
+                assembler.output_flag = false;
+                Ok(vec![])
+            }
             ".ds" => match self.args.len() {
                 1 => Ok(vec![0; self.args[0].eval(assembler)? as usize]),
                 2 => Ok(vec![
@@ -185,5 +195,25 @@ impl Action for PseudoOp {
 
     fn is_equ(&self) -> bool {
         matches!(self.op_name_lcase.as_str(), "=" | ".equ")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{assemble, source};
+
+    #[test]
+    fn test_onoff() {
+        let src = "
+        .org $100
+        .off
+foo     .ds 2
+bar     .ds 1
+foobar";
+        let info = assemble(source::from_str(src, src)).unwrap();
+        assert_eq!(info.symtab["foo"].value, Some(0x100));
+        assert_eq!(info.symtab["bar"].value, Some(0x102));
+        assert_eq!(info.symtab["foobar"].value, Some(0x103));
+        assert!(info.bytes.is_empty());
     }
 }

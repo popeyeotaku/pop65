@@ -27,6 +27,7 @@ pub struct Assembler {
     pub cur_line: Option<Rc<Line>>,
     building_comment: Option<String>,
     errcount: u32,
+    pub output_flag: bool,
 }
 
 impl Assembler {
@@ -42,6 +43,7 @@ impl Assembler {
             debug_fmt: None,
             building_comment: None,
             errcount: 0,
+            output_flag: true,
         }
     }
 
@@ -112,7 +114,9 @@ impl Assembler {
         if let Some(action) = &line.action {
             let new_bytes = action.pass2(self)?;
             self.pc_add(new_bytes.len() as u16)?;
-            output.extend(new_bytes);
+            if self.output_flag {
+                output.extend(new_bytes);
+            }
         }
         Ok(())
     }
