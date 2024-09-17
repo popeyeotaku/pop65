@@ -87,15 +87,13 @@ impl Action for PseudoOp {
                 }
                 Ok(0)
             }
-            "=" => {
+            "="|".equ" => {
                 if self.args.len() != 1 {
                     return self.arg_count_err();
                 }
                 if let Some(label) = label {
-                    let value = Some(self.args[0].eval(assembler)?);
-                    let sym = assembler.lookup(label.clone().text(), label.clone());
-                    sym.defined_at = Some(label);
-                    sym.value = value;
+                    let value = self.args[0].eval(assembler)?;
+                    assembler.def_symbol(label.clone().text(), label.clone(), value)?;
                     Ok(0)
                 } else {
                     self.line_slice().err("missing label for '='")
@@ -153,7 +151,7 @@ impl Action for PseudoOp {
                 }
             }
             ".inc" | ".lib" | ".fil" => Ok(vec![]),
-            "=" => Ok(vec![]),
+            "="|".equ" => Ok(vec![]),
             ".org" => self.pass1(assembler, None).map(|_| vec![]),
             ".byte" => {
                 let mut bytes = Vec::with_capacity(self.args.len());
@@ -182,6 +180,13 @@ impl Action for PseudoOp {
             Rc::new(self.op_name.join(&last_arg.slice))
         } else {
             self.op_name.clone()
+        }
+    }
+
+    fn is_equ(&self) -> bool {
+        match self.op_name_lcase.as_str() {
+            "=" | ".equ" => true,
+            _ => false,
         }
     }
 }

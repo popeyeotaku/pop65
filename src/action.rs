@@ -14,4 +14,9 @@ pub trait Action {
 
     /// Return the underlying LineSlice for this entire action.
     fn line_slice(&self) -> Rc<LineSlice>;
+
+    /// Return a flag for if this is the `.equ`/`=` pseudo-op.
+    fn is_equ(&self) -> bool {
+        false
+    }
 }

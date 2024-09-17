@@ -50,6 +50,13 @@ impl Assembler {
         self.cur_line = Some(line.clone());
         let parsed = self.parse_line(line.clone())?;
         let comment = parsed.filter_comment();
+        let is_equ = {
+            if let Some(action) = &parsed.action {
+                action.is_equ()
+            } else {
+                false
+            }
+        };
         if let Some(label_slice) = &parsed.label {
             let comment_label = {
                 if let Some(s) = self.building_comment.take() {
@@ -58,7 +65,9 @@ impl Assembler {
                     comment.map(String::from)
                 }
             };
-            self.def_label(label_slice.text(), label_slice.clone(), comment_label)?;
+            if !is_equ {
+                self.def_label(label_slice.text(), label_slice.clone(), comment_label)?;
+            }
         }
         if let Some(action) = &parsed.action {
             let size = action.pass1(self, parsed.label.clone())?;
@@ -193,6 +202,8 @@ impl Assembler {
     }
 
     /// Define a new label at the current PC, complaining if it was redefined.
+    ///
+    /// In the first pass, this also outputs the debug string.
     pub fn def_label(
         &mut self,
         label: &str,
@@ -271,7 +282,10 @@ impl Assembler {
 mod tests {
     use std::rc::Rc;
 
-    use crate::source::{self, LineSlice};
+    use crate::{
+        assemble,
+        source::{self, LineSlice},
+    };
 
     use super::{Assembler, Pass};
 
@@ -302,5 +316,19 @@ mod tests {
         assert_eq!(asm.lookup("bar", bar).value, Some(2));
         assert_eq!(asm.lookup("foobar", foobar).value, Some(4));
         assert_eq!(*asm.pc().unwrap(), 6);
+    }
+
+    #[test]
+    fn test_nodbg_equ() {
+        let src = "
+        .org 0
+        .dbg '{L}:{V}'
+foo     = 1234
+bar     .equ foo*2
+";
+        let result = assemble(source::from_str(src, "src")).unwrap();
+        assert!(result.debug_str.is_empty());
+        assert_eq!(result.symtab["foo"].value, Some(1234));
+        assert_eq!(result.symtab["bar"].value, Some(2468));
     }
 }
