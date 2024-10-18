@@ -134,6 +134,12 @@ impl Assembler {
             } else if c == '$' {
                 chars.next();
                 self.parse_num(16, chars)
+            } else if c == '%' {
+                chars.next();
+                self.parse_num(2, chars)
+            } else if c == '@' {
+                chars.next();
+                self.parse_num(8, chars)
             } else if c.is_ascii_alphabetic() {
                 let name = self.parse_name(chars).unwrap();
                 // Ensure this reference to the symbol is noticed
