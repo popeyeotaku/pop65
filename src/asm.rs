@@ -82,10 +82,13 @@ impl Assembler {
                 s.push('\n');
             }
         }
-        if parsed.label.is_some() || parsed.action.is_some() {
+
+        if comment.is_none() || parsed.label.is_some() || parsed.action.is_some() {
             self.building_comment = None;
         }
+
         self.parsed_lines.push(parsed);
+
         Ok(())
     }
 
@@ -168,7 +171,7 @@ impl Assembler {
                                 return slice.err("bad debug format string");
                             }
                             self.debug_str
-                                .push_str(&comment.unwrap_or("").replace("\n", " "));
+                                .push_str(&comment.unwrap_or("").trim_end().replace("\n", " "));
                         }
                         Some('V') => {
                             let mut starting_offset: u32 = 0;
@@ -303,7 +306,7 @@ mod tests {
 
     use crate::{
         assemble,
-        source::{self, LineSlice},
+        source::{self, from_str, LineSlice},
     };
 
     use super::{Assembler, Pass};
@@ -359,5 +362,22 @@ bar     .equ foo*2
 foo     .word foo";
         let info = assemble(source::from_str(src, src)).unwrap();
         assert_eq!(info.debug_str.as_str(), "foo:234\n");
+    }
+
+    #[test]
+    fn test_reset_building_comment() {
+        let src = "
+        .org $1234
+        .dbg ';{C}'
+        ;foobar
+foo     .word bar
+        ;foo
+        ;bar
+        
+bar     .word foo";
+        assert_eq!(
+            &assemble(from_str(src, "src")).unwrap().debug_str,
+            ";foobar\n;\n"
+        );
     }
 }
