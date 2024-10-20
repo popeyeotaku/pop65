@@ -44,12 +44,10 @@ impl Ord for Symbol {
 
 impl Display for Symbol {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Some(v) = self.value {
-            f.write_fmt(format_args!("{v:04X}: "))?;
-        } else {
-            f.write_str("      ")?;
-        }
         f.write_str(&self.name)?;
+        if let Some(v) = self.value {
+            f.write_fmt(format_args!(" : {v:04X}"))?;
+        }
         if let Some(c) = &self.comment {
             f.write_fmt(format_args!(" : {}", c.replace("\n", " ")))?;
         }
