@@ -49,6 +49,7 @@ impl Action for PseudoOp {
         label: Option<Rc<LineSlice>>,
     ) -> Result<u16, String> {
         match self.op_name_lcase.as_str() {
+            ".assert" => Ok(0),
             ".dbg" => {
                 if self.args.is_empty() {
                     assembler.debug_fmt = None;
@@ -130,6 +131,18 @@ impl Action for PseudoOp {
 
     fn pass2(&self, assembler: &mut Assembler) -> Result<Vec<u8>, String> {
         match self.op_name_lcase.as_str() {
+            ".assert" => {
+                if self.args.len() == 1 {
+                    let val = self.args[0].eval(assembler)?;
+                    if val == 0 {
+                        self.line_slice().err("assertion error")
+                    } else {
+                        Ok(vec![])
+                    }
+                } else {
+                    self.arg_count_err()
+                }
+            }
             ".on" => {
                 assembler.output_flag = true;
                 Ok(vec![])
@@ -200,7 +213,7 @@ impl Action for PseudoOp {
 
 #[cfg(test)]
 mod tests {
-    use crate::{assemble, source};
+    use crate::{assemble, assemble_str, source};
 
     #[test]
     fn test_onoff() {
@@ -215,5 +228,15 @@ foobar";
         assert_eq!(info.symtab["bar"].value, Some(0x102));
         assert_eq!(info.symtab["foobar"].value, Some(0x103));
         assert!(info.bytes.is_empty());
+    }
+
+    #[test]
+    fn test_assert() {
+        assert!(assemble_str(
+            ".ASSERT 1 > 2",
+            "this test will print an assembler assertion error, no worries"
+        )
+        .is_err());
+        assert!(assemble_str(".ASSERT 2 > 1", "").is_ok());
     }
 }

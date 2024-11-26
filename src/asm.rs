@@ -292,7 +292,8 @@ mod tests {
     use std::rc::Rc;
 
     use crate::{
-        assemble, source::{self, from_str, LineSlice},
+        assemble,
+        source::{self, from_str, LineSlice},
     };
 
     use super::{Assembler, Pass};
