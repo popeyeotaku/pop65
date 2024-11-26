@@ -102,7 +102,7 @@ impl Action for PseudoOp {
             ".org" => {
                 if self.args.len() == 1 {
                     let val = self.args[0].eval(assembler)?;
-                    assembler.program_counter = Some(val);
+                    assembler.pc = val;
                     Ok(0)
                 } else {
                     self.arg_count_err()

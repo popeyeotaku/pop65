@@ -23,19 +23,22 @@ pub struct Assembler {
     pub debug_fmt: Option<String>,
     pub pass: Pass,
     pub symtab: HashMap<String, Box<Symbol>>,
-    pub program_counter: u16,
+    pub pc: u16,
     pub cur_line: Option<Rc<Line>>,
     building_comment: Option<String>,
     errcount: u32,
     pub output_flag: bool,
 }
 
+/// The initial value of the assembler's program counter.
+const DEFAULT_PC: u16 = 0;
+
 impl Assembler {
     pub fn new(src: Source) -> Self {
         Self {
             src_stk: Box::new(SrcStack::new(src)),
             symtab: HashMap::new(),
-            program_counter: None,
+            pc: DEFAULT_PC,
             parsed_lines: Vec::new(),
             pass: Pass::None,
             cur_line: None,
@@ -73,7 +76,7 @@ impl Assembler {
         }
         if let Some(action) = &parsed.action {
             let size = action.pass1(self, parsed.label.clone())?;
-            self.pc_add(size)?;
+            self.pc = self.pc.wrapping_add(size);
         }
         if let Some(c) = comment {
             if parsed.label.is_none() && parsed.action.is_none() {
@@ -97,7 +100,7 @@ impl Assembler {
         self.pass = Pass::Pass1;
         self.parsed_lines.clear();
         self.symtab.clear();
-        self.program_counter = None;
+        self.pc = DEFAULT_PC;
 
         while let Some(line) = self.src_stk.next() {
             if let Err(msg) = self.pass1_line(line) {
@@ -116,7 +119,7 @@ impl Assembler {
     fn pass2_line(&mut self, line: &ParsedLine, output: &mut Vec<u8>) -> Result<(), String> {
         if let Some(action) = &line.action {
             let new_bytes = action.pass2(self)?;
-            self.pc_add(new_bytes.len() as u16)?;
+            self.pc = self.pc.wrapping_add(new_bytes.len() as u16);
             if self.output_flag {
                 output.extend(new_bytes);
             }
@@ -127,7 +130,7 @@ impl Assembler {
     /// Final assembly.
     pub fn pass2(&mut self) -> Result<Vec<u8>, String> {
         assert!(self.errcount == 0);
-        self.program_counter = None;
+        self.pc = DEFAULT_PC;
         self.pass = Pass::Pass2;
         let mut output: Vec<u8> = Vec::with_capacity((u16::MAX as usize) + 1);
         let lines = mem::take(&mut self.parsed_lines);
@@ -225,7 +228,7 @@ impl Assembler {
         slice: Rc<LineSlice>,
         comment_label: Option<String>,
     ) -> Result<(), String> {
-        let pc = *self.pc()?;
+        let pc = self.pc;
         if self.pass == Pass::Pass1 && self.debug_fmt.is_some() {
             self.debug_label(label, slice.clone(), pc, comment_label.as_deref())?
         }
@@ -308,20 +311,19 @@ mod tests {
 
         let mut asm = Box::new(Assembler::new(src));
         asm.pass = Pass::Pass1;
-        asm.program_counter = Some(0);
 
         asm.lookup("foobar", foobar.clone());
         asm.def_label("foo", foo.clone(), None).unwrap();
-        asm.pc_add(2).unwrap();
+        asm.pc = asm.pc.wrapping_add(2);
         asm.def_label("bar", bar.clone(), None).unwrap();
-        asm.pc_add(2).unwrap();
+        asm.pc = asm.pc.wrapping_add(2);
         asm.def_label("foobar", foobar.clone(), None).unwrap();
-        asm.pc_add(2).unwrap();
+        asm.pc = asm.pc.wrapping_add(2);
 
         assert_eq!(asm.lookup("foo", foo).value, Some(0));
         assert_eq!(asm.lookup("bar", bar).value, Some(2));
         assert_eq!(asm.lookup("foobar", foobar).value, Some(4));
-        assert_eq!(*asm.pc().unwrap(), 6);
+        assert_eq!(asm.pc, 6);
     }
 
     #[test]

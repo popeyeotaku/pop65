@@ -398,7 +398,7 @@ impl OpCode {
             let val = expr.eval(asm)?;
             let mut val_bytes = Vec::from(val.to_le_bytes());
             if amode == AMode::Rel {
-                let here = (*asm.pc()? as i32) + 2;
+                let here = (asm.pc as i32) + 2;
                 let there = val as i32;
                 let offset = there - here;
                 if let Ok(byte_offset) = i8::try_from(offset) {
