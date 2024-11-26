@@ -23,7 +23,7 @@ pub struct Assembler {
     pub debug_fmt: Option<String>,
     pub pass: Pass,
     pub symtab: HashMap<String, Box<Symbol>>,
-    pub program_counter: Option<u16>,
+    pub program_counter: u16,
     pub cur_line: Option<Rc<Line>>,
     building_comment: Option<String>,
     errcount: u32,
@@ -144,13 +144,6 @@ impl Assembler {
         } else {
             Err(format!("{} errors in pass 2", self.errcount))
         }
-    }
-
-    /// Add a value to the current PC.
-    pub fn pc_add(&mut self, offset: u16) -> Result<(), String> {
-        let pc = self.pc()?;
-        *pc = pc.wrapping_add(offset);
-        Ok(())
     }
 
     /// Output a debug info string.
@@ -287,15 +280,6 @@ impl Assembler {
                     ))
                 }
             }
-        }
-    }
-
-    /// Return the current program counter, or an error if it hasn't been set.
-    pub fn pc(&mut self) -> Result<&mut u16, String> {
-        if let Some(pc) = self.program_counter.as_mut() {
-            Ok(pc)
-        } else {
-            Err("program counter was never set".to_string())
         }
     }
 }
