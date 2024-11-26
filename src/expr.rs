@@ -30,6 +30,17 @@ pub enum ExLab {
     Lo(Box<ExprNode>),
     Expr(Box<ExprNode>),
     Str(String),
+    RelOp(RelOp, Box<ExprNode>, Box<ExprNode>),
+}
+
+/// A relational operator.
+pub enum RelOp {
+    Less,
+    Great,
+    Equ,
+    Nequ,
+    LessEqu,
+    GreatEqu,
 }
 
 impl ExprNode {
@@ -60,6 +71,23 @@ impl ExprNode {
                 2.. => self.slice.err("string must consist of one byte only"),
                 _ => Ok(s.bytes().next().unwrap() as u16),
             },
+            ExLab::RelOp(rel_op, left, right) => {
+                let left = left.eval(asm)?;
+                let right = right.eval(asm)?;
+                let result = match rel_op {
+                    RelOp::Less => left < right,
+                    RelOp::Great => left > right,
+                    RelOp::Equ => left == right,
+                    RelOp::Nequ => left != right,
+                    RelOp::LessEqu => left <= right,
+                    RelOp::GreatEqu => left >= right,
+                };
+                if result {
+                    Ok(1)
+                } else {
+                    Ok(0)
+                }
+            }
         }
     }
 }

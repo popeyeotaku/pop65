@@ -4,7 +4,7 @@ use std::{iter::Peekable, rc::Rc};
 
 use crate::{
     asm::Assembler,
-    expr::{ExLab, ExprNode},
+    expr::{ExLab, ExprNode, RelOp},
 };
 
 use super::LineChars;
@@ -35,7 +35,55 @@ impl Assembler {
                 _ => (),
             }
         }
-        self.parse_addsub(chars)
+        self.parse_relop(chars)
+    }
+
+    /// Parse a relational expression.
+    fn parse_relop(&mut self, chars: &mut Peekable<LineChars>) -> Result<Box<ExprNode>, String> {
+        let mut e = self.parse_addsub(chars)?;
+
+        self.skip_ws(chars);
+        while let Some((c, start)) = chars.peek().cloned() {
+            let (op, slice) = match c {
+                '<' => {
+                    chars.next().unwrap();
+                    match chars.peek().cloned() {
+                        Some(('=', end)) => {
+                            chars.next().unwrap();
+                            (RelOp::LessEqu, Rc::new(start.join(&end)))
+                        }
+                        Some(('>', end)) => {
+                            chars.next().unwrap();
+                            (RelOp::Nequ, Rc::new(start.join(&end)))
+                        }
+                        _ => (RelOp::Less, start),
+                    }
+                }
+                '>' => {
+                    chars.next().unwrap();
+                    match chars.peek().cloned() {
+                        Some(('=', end)) => {
+                            chars.next().unwrap();
+                            (RelOp::GreatEqu, Rc::new(start.join(&end)))
+                        }
+                        Some(('<', end)) => {
+                            chars.next().unwrap();
+                            (RelOp::Nequ, Rc::new(start.join(&end)))
+                        }
+                        _ => (RelOp::Great, start),
+                    }
+                }
+                '=' => {
+                    chars.next().unwrap();
+                    (RelOp::Equ, start)
+                }
+                _ => break,
+            };
+            let right = self.parse_addsub(chars)?;
+            e = ExprNode::new(ExLab::RelOp(op, e, right), slice);
+        }
+
+        Ok(e)
     }
 
     /// Parse a '+'/'-' expression.

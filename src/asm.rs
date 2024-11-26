@@ -292,8 +292,7 @@ mod tests {
     use std::rc::Rc;
 
     use crate::{
-        assemble,
-        source::{self, from_str, LineSlice},
+        assemble, source::{self, from_str, LineSlice},
     };
 
     use super::{Assembler, Pass};
@@ -364,5 +363,30 @@ bar     .word foo";
             &assemble(from_str(src, "src")).unwrap().debug_str,
             ";foobar\n;\n"
         );
+    }
+
+    #[test]
+    fn test_relop() {
+        let src = "
+FOO = 2
+BAR = 3
+L = FOO < BAR
+G = FOO > BAR
+LE = FOO <= BAR
+GE = FOO >= BAR
+E = FOO = BAR
+NE = FOO >< BAR
+NE2 = FOO <> BAR
+        ";
+        let info = assemble(source::from_str(src, "src")).unwrap();
+        assert_eq!(info.symtab["FOO"].value, Some(2));
+        assert_eq!(info.symtab["BAR"].value, Some(3));
+        assert_eq!(info.symtab["L"].value, Some(1));
+        assert_eq!(info.symtab["G"].value, Some(0));
+        assert_eq!(info.symtab["LE"].value, Some(1));
+        assert_eq!(info.symtab["GE"].value, Some(0));
+        assert_eq!(info.symtab["E"].value, Some(0));
+        assert_eq!(info.symtab["NE"].value, Some(1));
+        assert_eq!(info.symtab["NE2"].value, Some(1));
     }
 }
