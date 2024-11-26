@@ -19,4 +19,9 @@ pub trait Action {
     fn is_equ(&self) -> bool {
         false
     }
+
+    /// Return a flag for if this is an ".else" or ".endif" pseudo-op.
+    fn is_if_affiliated(&self) -> bool {
+        false
+    }
 }

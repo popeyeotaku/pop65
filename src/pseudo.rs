@@ -49,6 +49,36 @@ impl Action for PseudoOp {
         label: Option<Rc<LineSlice>>,
     ) -> Result<u16, String> {
         match self.op_name_lcase.as_str() {
+            ".if" => {
+                if self.args.len() == 1 {
+                    let cond_val = self.args[0].eval(assembler)?;
+                    assembler.if_stack.push(cond_val != 0);
+                    Ok(0)
+                } else {
+                    self.arg_count_err()
+                }
+            }
+            ".endif" => {
+                if assembler.if_stack.pop().is_none() {
+                    self.line_slice().err("missing matching if")
+                } else if !self.args.is_empty() {
+                    self.line_slice().err("no args on endif")
+                } else {
+                    Ok(0)
+                }
+            }
+            ".else" => {
+                if let Some(cond_val) = assembler.if_stack.last_mut() {
+                    *cond_val = !*cond_val;
+                    if self.args.is_empty() {
+                        Ok(0)
+                    } else {
+                        self.line_slice().err("no args on else")
+                    }
+                } else {
+                    self.line_slice().err("missing matching if")
+                }
+            }
             ".assert" => Ok(0),
             ".dbg" => {
                 if self.args.is_empty() {
@@ -131,6 +161,10 @@ impl Action for PseudoOp {
 
     fn pass2(&self, assembler: &mut Assembler) -> Result<Vec<u8>, String> {
         match self.op_name_lcase.as_str() {
+            ".if" | ".else" | ".endif" => {
+                // statements skipped by these should already have been deleted, so do nothing.
+                Ok(vec![])
+            }
             ".assert" => {
                 if self.args.len() == 1 {
                     let val = self.args[0].eval(assembler)?;
@@ -209,6 +243,10 @@ impl Action for PseudoOp {
     fn is_equ(&self) -> bool {
         matches!(self.op_name_lcase.as_str(), "=" | ".equ")
     }
+
+    fn is_if_affiliated(&self) -> bool {
+        matches!(self.op_name_lcase.as_str(), ".else" | ".endif")
+    }
 }
 
 #[cfg(test)]
@@ -238,5 +276,21 @@ foobar";
         )
         .is_err());
         assert!(assemble_str(".ASSERT 2 > 1", "").is_ok());
+    }
+
+    #[test]
+    fn test_if() {
+        let src = "
+FOO = 1
+BAR = 2
+.IF FOO = BAR
+    .BYTE 1,2,3
+.ELSE
+    .IF FOO < BAR
+        .BYTE 4,5,6
+    .ENDIF
+    .BYTE 7,8,9
+.ENDIF";
+        assert_eq!(assemble_str(src, "src"), Ok(vec![4, 5, 6, 7, 8, 9]));
     }
 }

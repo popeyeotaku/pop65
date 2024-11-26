@@ -28,6 +28,7 @@ pub struct Assembler {
     building_comment: Option<String>,
     errcount: u32,
     pub output_flag: bool,
+    pub if_stack: Vec<bool>,
 }
 
 /// The initial value of the assembler's program counter.
@@ -47,6 +48,7 @@ impl Assembler {
             building_comment: None,
             errcount: 0,
             output_flag: true,
+            if_stack: Vec::new(),
         }
     }
 
@@ -54,6 +56,17 @@ impl Assembler {
     fn pass1_line(&mut self, line: Rc<Line>) -> Result<(), String> {
         self.cur_line = Some(line.clone());
         let parsed = self.parse_line(line.clone())?;
+
+        if !*self.if_stack.last().unwrap_or(&true) {
+            if let Some(action) = &parsed.action {
+                if !action.is_if_affiliated() {
+                    return Ok(());
+                }
+            } else {
+                return Ok(());
+            }
+        }
+
         let comment = parsed.filter_comment();
         let is_equ = {
             if let Some(action) = &parsed.action {
@@ -101,6 +114,7 @@ impl Assembler {
         self.parsed_lines.clear();
         self.symtab.clear();
         self.pc = DEFAULT_PC;
+        self.if_stack.clear();
 
         while let Some(line) = self.src_stk.next() {
             if let Err(msg) = self.pass1_line(line) {
@@ -108,6 +122,12 @@ impl Assembler {
                 self.errcount += 1;
             }
         }
+
+        if !self.if_stack.is_empty() {
+            eprintln!("unmatched if statements");
+            self.errcount += 1;
+        }
+
         if self.errcount == 0 {
             Ok(())
         } else {
