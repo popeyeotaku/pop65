@@ -73,7 +73,6 @@ mod tests {
     #[test]
     fn test_c64_hello() {
         let src = "
-        .org 0
         .word $801
         .org $801
 bashed  .word bashe1
@@ -130,7 +129,6 @@ foo     .word foo";
         let foo: [u8; 4] = [1, 2, 3, 4];
         fs::write("foo.bin", foo).unwrap();
         let src = "
-        .org 0
 foo     .incbin \"foo.bin\"
         .ds $10-*
 bar     ";
@@ -148,7 +146,6 @@ bar     ";
     #[test]
     fn test_label_comments() {
         let src = "
-        .org 0
 ; Foo does a 
 ; bunch of different things.
 foo     .word foo   ; ignored

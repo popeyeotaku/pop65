@@ -329,7 +329,6 @@ mod tests {
     #[test]
     fn test_nodbg_equ() {
         let src = "
-        .org 0
         .dbg '{L}:{V}'
 foo     = 1234
 bar     .equ foo*2
