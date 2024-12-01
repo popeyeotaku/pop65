@@ -53,7 +53,7 @@ impl<'a> LineChars<'a> {
     }
 }
 
-impl<'a> Iterator for LineChars<'a> {
+impl Iterator for LineChars<'_> {
     type Item = (char, Rc<LineSlice>);
 
     fn next(&mut self) -> Option<Self::Item> {
