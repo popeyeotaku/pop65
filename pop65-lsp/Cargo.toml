@@ -1,0 +1,8 @@
+[package]
+name = "pop65-lsp"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tower-lsp = "0.20.*"
+tokio = { version = "1.42.*", features = ["full"] }
