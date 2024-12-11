@@ -8,6 +8,9 @@ use crate::{
     symbol::Symbol,
 };
 
+/// Indicates how many bytes should be printed on a listing line.
+const BYTES_PER_LINE: usize = 3;
+
 /// Represents the current assembly pass.
 #[derive(PartialEq)]
 pub enum Pass {
@@ -29,13 +32,21 @@ pub struct Assembler {
     errcount: u32,
     pub output_flag: bool,
     pub if_stack: Vec<bool>,
+    pub listing: Option<String>,
 }
 
 /// The initial value of the assembler's program counter.
 const DEFAULT_PC: u16 = 0;
 
 impl Assembler {
-    pub fn new(src: Source) -> Self {
+    pub fn new(src: Source, list_file: bool) -> Self {
+        let listing = {
+            if list_file {
+                Some(String::new())
+            } else {
+                None
+            }
+        };
         Self {
             src_stk: Box::new(SrcStack::new(src)),
             symtab: HashMap::new(),
@@ -49,6 +60,7 @@ impl Assembler {
             errcount: 0,
             output_flag: true,
             if_stack: Vec::new(),
+            listing,
         }
     }
 
@@ -137,9 +149,21 @@ impl Assembler {
 
     /// Handle a single line in pass2.
     fn pass2_line(&mut self, line: &ParsedLine, output: &mut Vec<u8>) -> Result<(), String> {
+        let old_pc = self.pc;
         if let Some(action) = &line.action {
             let new_bytes = action.pass2(self)?;
             self.pc = self.pc.wrapping_add(new_bytes.len() as u16);
+            if let Some(l) = self.listing.as_mut() {
+                l.push_str(&format!("{:06} {:04X} ", line.line.line_num, old_pc));
+                for i in 0..BYTES_PER_LINE {
+                    if let Some(b) = new_bytes.get(i) {
+                        l.push_str(&format!("{:02X}", *b));
+                    } else {
+                        l.push_str("  ");
+                    }
+                }
+                l.push_str(&format!(" {}\n", line.line.text));
+            }
             if self.output_flag {
                 output.extend(new_bytes);
             }
@@ -329,7 +353,7 @@ mod tests {
         assert_eq!(bar.text(), "bar");
         assert_eq!(foobar.text(), "foobar");
 
-        let mut asm = Box::new(Assembler::new(src));
+        let mut asm = Box::new(Assembler::new(src, false));
         asm.pass = Pass::Pass1;
 
         asm.lookup("foobar", foobar.clone());
@@ -353,7 +377,7 @@ mod tests {
 foo     = 1234
 bar     .equ foo*2
 ";
-        let result = assemble(source::from_str(src, "src")).unwrap();
+        let result = assemble(source::from_str(src, "src"), false).unwrap();
         assert!(result.debug_str.is_empty());
         assert_eq!(result.symtab["foo"].value, Some(1234));
         assert_eq!(result.symtab["bar"].value, Some(2468));
@@ -365,7 +389,7 @@ bar     .equ foo*2
         .org $1234
         .dbg '{L}:{V-1000}'
 foo     .word foo";
-        let info = assemble(source::from_str(src, src)).unwrap();
+        let info = assemble(source::from_str(src, src), false).unwrap();
         assert_eq!(info.debug_str.as_str(), "foo:234\n");
     }
 
@@ -381,7 +405,7 @@ foo     .word bar
         
 bar     .word foo";
         assert_eq!(
-            &assemble(from_str(src, "src")).unwrap().debug_str,
+            &assemble(from_str(src, "src"), false).unwrap().debug_str,
             ";foobar\n;\n"
         );
     }
@@ -399,7 +423,7 @@ E = FOO = BAR
 NE = FOO >< BAR
 NE2 = FOO <> BAR
         ";
-        let info = assemble(source::from_str(src, "src")).unwrap();
+        let info = assemble(source::from_str(src, "src"), false).unwrap();
         assert_eq!(info.symtab["FOO"].value, Some(2));
         assert_eq!(info.symtab["BAR"].value, Some(3));
         assert_eq!(info.symtab["L"].value, Some(1));
@@ -409,5 +433,19 @@ NE2 = FOO <> BAR
         assert_eq!(info.symtab["E"].value, Some(0));
         assert_eq!(info.symtab["NE"].value, Some(1));
         assert_eq!(info.symtab["NE2"].value, Some(1));
+    }
+
+    #[test]
+    fn test_listing() {
+        let s = ".ORG $1234
+FOO     .WORD BAR
+BAR     .WORD FOO";
+        let info = assemble(from_str(s, "{s}"), true).unwrap();
+        assert_eq!(
+            &info.listing.unwrap(),
+            "000001 0000        .ORG $1234
+000002 1234 3612   FOO     .WORD BAR
+000003 1236 3412   BAR     .WORD FOO\n"
+        );
     }
 }

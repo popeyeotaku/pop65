@@ -5,7 +5,7 @@ use pop65::assemble;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();
-    let info = assemble(pop65::from_file(&cli.source)?)?;
+    let info = assemble(pop65::from_file(&cli.source)?, cli.list_file.is_some())?;
     fs::write(cli.output, &info.bytes)?;
     if let Some(sympath) = cli.symbol_file {
         let symstr = info.dump_symtab();
@@ -13,6 +13,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
     if let Some(dbgpath) = cli.debug_file {
         fs::write(dbgpath, &info.debug_str)?;
+    }
+    if let Some(listpath) = cli.list_file {
+        fs::write(listpath, info.listing.unwrap())?;
     }
     Ok(())
 }
@@ -30,4 +33,7 @@ struct Cli {
 
     #[arg(short, long)]
     debug_file: Option<String>,
+
+    #[arg(short, long)]
+    list_file: Option<String>,
 }

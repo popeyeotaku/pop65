@@ -16,6 +16,7 @@ use crate::{
 };
 
 pub struct ParsedLine {
+    pub line: Rc<Line>,
     pub label: Option<Rc<LineSlice>>,
     pub action: Option<Box<dyn Action>>,
     pub comment: Option<Rc<LineSlice>>,
@@ -86,6 +87,7 @@ impl Assembler {
             pos.err("unexpected characters past end of line")
         } else {
             Ok(ParsedLine {
+                line,
                 label,
                 action,
                 comment,
@@ -370,7 +372,7 @@ mod tests {
         let bar = Rc::new(Line::new("bar foobar", "foobar", 2));
         let bl = Rc::new(Line::new("", "foobar", 3));
         let foobar = Rc::new(Line::new("foobar", "foobar", 4));
-        let mut asm = Assembler::new(test);
+        let mut asm = Assembler::new(test, false);
 
         assert_eq!(
             asm.parse_name(&mut LineChars::new(&foo).peekable()),

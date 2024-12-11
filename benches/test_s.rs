@@ -4,7 +4,7 @@ use criterion::{criterion_group, criterion_main, Criterion};
 use pop65::{assemble, from_file};
 
 fn test_s() -> Result<(), Box<dyn Error>> {
-    let _info = assemble(from_file("test.s")?)?;
+    let _info = assemble(from_file("test.s")?, false)?;
     Ok(())
 }
 

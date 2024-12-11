@@ -107,7 +107,7 @@ mod tests {
     #[test]
     fn test_expr_parse_eval() {
         let text = "(1 + 2) * 3 - 4";
-        let mut asm = Assembler::new(source::from_str(text, "text"));
+        let mut asm = Assembler::new(source::from_str(text, "text"), false);
         let line = Rc::new(Line::new(text, "text", 1));
         let e = asm
             .parse_expr(&mut LineChars::new(&line).peekable())
@@ -122,7 +122,7 @@ mod tests {
             ExLab::Neg(ExprNode::new(ExLab::Num(1), f.clone())),
             f.clone(),
         );
-        let mut a = Assembler::new(source::from_str("foo", "foo"));
+        let mut a = Assembler::new(source::from_str("foo", "foo"), false);
         assert_eq!(n.eval(&mut a), Ok(0xFFFF));
     }
 }

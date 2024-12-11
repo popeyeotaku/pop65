@@ -261,7 +261,7 @@ mod tests {
 foo     .ds 2
 bar     .ds 1
 foobar";
-        let info = assemble(source::from_str(src, src)).unwrap();
+        let info = assemble(source::from_str(src, src), false).unwrap();
         assert_eq!(info.symtab["foo"].value, Some(0x100));
         assert_eq!(info.symtab["bar"].value, Some(0x102));
         assert_eq!(info.symtab["foobar"].value, Some(0x103));

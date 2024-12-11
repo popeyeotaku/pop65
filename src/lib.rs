@@ -10,7 +10,7 @@ pub use symbol::Symbol;
 /// Assemble code from a source string.
 pub fn assemble_str(src: &str, path: &str) -> Result<Vec<u8>, String> {
     let src = source::from_str(src, path);
-    let info = assemble(src)?;
+    let info = assemble(src, false)?;
     Ok(info.bytes)
 }
 
@@ -19,6 +19,7 @@ pub struct AsmInfo {
     pub bytes: Vec<u8>,
     pub symtab: HashMap<String, Box<Symbol>>,
     pub debug_str: String,
+    pub listing: Option<String>,
 }
 
 impl AsmInfo {
@@ -35,14 +36,15 @@ impl AsmInfo {
 }
 
 /// Assemble a source file.
-pub fn assemble(src: Source) -> Result<AsmInfo, String> {
-    let mut asm = Box::new(Assembler::new(src));
+pub fn assemble(src: Source, listing: bool) -> Result<AsmInfo, String> {
+    let mut asm = Box::new(Assembler::new(src, listing));
     asm.pass1()?;
     let bytes = asm.pass2()?;
     Ok(AsmInfo {
         bytes,
         symtab: mem::take(&mut asm.symtab),
         debug_str: mem::take(&mut asm.debug_str),
+        listing: mem::take(&mut asm.listing),
     })
 }
 
@@ -108,7 +110,7 @@ print2  rts";
 
     #[test]
     fn test_include() {
-        let info = assemble(from_file("inc_test.s").unwrap()).unwrap();
+        let info = assemble(from_file("inc_test.s").unwrap(), false).unwrap();
         assert_eq!(info.bytes, vec![0x36, 0x12, 0x34, 0x12])
     }
 
@@ -118,7 +120,7 @@ print2  rts";
         .org $8000
         .dbg \"P:{VC000}:{L}\"
 foo     .word foo";
-        let info = assemble(source::from_str(src, "src")).unwrap();
+        let info = assemble(source::from_str(src, "src"), false).unwrap();
         assert_eq!(&info.bytes, &vec![0x00, 0x80]);
         assert_eq!(info.symtab["foo"].value, Some(0x8000));
         assert_eq!(&info.debug_str, "P:14000:foo\n");
@@ -132,7 +134,7 @@ foo     .word foo";
 foo     .incbin \"foo.bin\"
         .ds $10-*
 bar     ";
-        let info = assemble(source::from_str(src, "src")).unwrap();
+        let info = assemble(source::from_str(src, "src"), false).unwrap();
         let mut long_foo: Vec<u8> = vec![0; 0x10];
         long_foo[0] = 1;
         long_foo[1] = 2;
@@ -156,7 +158,7 @@ foobar  .word *     ; foobar's comment
                     ; bar's comment is also ignored
                     ; despite also having whitespace after it
 ";
-        let info = assemble(source::from_str(src, "src")).unwrap();
+        let info = assemble(source::from_str(src, "src"), false).unwrap();
         assert_eq!(
             info.symtab["foo"].comment,
             Some("Foo does a\nbunch of different things.\n".to_string())
