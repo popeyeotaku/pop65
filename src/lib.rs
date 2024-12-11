@@ -40,11 +40,22 @@ pub fn assemble(src: Source, listing: bool) -> Result<AsmInfo, String> {
     let mut asm = Box::new(Assembler::new(src, listing));
     asm.pass1()?;
     let bytes = asm.pass2()?;
+    let listing = {
+        if let Some(lines) = asm.listing.as_ref() {
+            let mut s = "LINENO PC   BYTES  LINE\n".to_string();
+            for line in lines {
+                s.push_str(&format!("{}\n", line.trim()));
+            }
+            Some(s)
+        } else {
+            None
+        }
+    };
     Ok(AsmInfo {
         bytes,
         symtab: mem::take(&mut asm.symtab),
         debug_str: mem::take(&mut asm.debug_str),
-        listing: mem::take(&mut asm.listing),
+        listing,
     })
 }
 

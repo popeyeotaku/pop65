@@ -6,7 +6,9 @@ use pop65::assemble;
 fn main() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();
     let info = assemble(pop65::from_file(&cli.source)?, cli.list_file.is_some())?;
-    fs::write(cli.output, &info.bytes)?;
+    if let Some(outpath) = cli.output {
+        fs::write(outpath, &info.bytes)?;
+    }
     if let Some(sympath) = cli.symbol_file {
         let symstr = info.dump_symtab();
         fs::write(sympath, symstr)?;
@@ -26,7 +28,7 @@ struct Cli {
     source: String,
 
     #[arg(short, long)]
-    output: String,
+    output: Option<String>,
 
     #[arg(short, long)]
     symbol_file: Option<String>,

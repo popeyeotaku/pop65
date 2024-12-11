@@ -4,7 +4,7 @@ use std::{collections::HashMap, mem, rc::Rc};
 
 use crate::{
     parse::ParsedLine,
-    source::{Line, LineSlice, Source, SrcStack},
+    source::{Line, LineNum, LineSlice, Source, SrcStack},
     symbol::Symbol,
 };
 
@@ -32,7 +32,8 @@ pub struct Assembler {
     errcount: u32,
     pub output_flag: bool,
     pub if_stack: Vec<bool>,
-    pub listing: Option<String>,
+    pub listing: Option<Vec<String>>,
+    listing_index: Option<HashMap<(String, LineNum), usize>>,
 }
 
 /// The initial value of the assembler's program counter.
@@ -40,11 +41,11 @@ const DEFAULT_PC: u16 = 0;
 
 impl Assembler {
     pub fn new(src: Source, list_file: bool) -> Self {
-        let listing = {
+        let (listing, listing_index) = {
             if list_file {
-                Some(String::new())
+                (Some(Vec::new()), Some(HashMap::new()))
             } else {
-                None
+                (None, None)
             }
         };
         Self {
@@ -61,6 +62,7 @@ impl Assembler {
             output_flag: true,
             if_stack: Vec::new(),
             listing,
+            listing_index,
         }
     }
 
@@ -68,6 +70,20 @@ impl Assembler {
     fn pass1_line(&mut self, line: Rc<Line>) -> Result<(), String> {
         self.cur_line = Some(line.clone());
         let parsed = self.parse_line(line.clone())?;
+
+        if let Some(listing) = self.listing.as_mut() {
+            let index = self.listing_index.as_mut().unwrap();
+            if index
+                .insert((line.path.clone(), line.line_num), listing.len())
+                .is_some()
+            {
+                panic!("saw the same line from the same file twice")
+            }
+            listing.push(format!(
+                "{:06} {:04X}        {}",
+                line.line_num, self.pc, line.text
+            ));
+        }
 
         if !*self.if_stack.last().unwrap_or(&true) {
             if let Some(action) = &parsed.action {
@@ -153,7 +169,10 @@ impl Assembler {
         if let Some(action) = &line.action {
             let new_bytes = action.pass2(self)?;
             self.pc = self.pc.wrapping_add(new_bytes.len() as u16);
-            if let Some(l) = self.listing.as_mut() {
+            if let Some(listing) = self.listing.as_mut() {
+                let index = self.listing_index.as_mut().unwrap();
+                let i = index[&(line.line.path.clone(), line.line.line_num)];
+                let mut l = String::new();
                 l.push_str(&format!("{:06} {:04X} ", line.line.line_num, old_pc));
                 for i in 0..BYTES_PER_LINE {
                     if let Some(b) = new_bytes.get(i) {
@@ -163,6 +182,7 @@ impl Assembler {
                     }
                 }
                 l.push_str(&format!(" {}\n", line.line.text));
+                listing[i] = l;
             }
             if self.output_flag {
                 output.extend(new_bytes);
@@ -437,15 +457,20 @@ NE2 = FOO <> BAR
 
     #[test]
     fn test_listing() {
-        let s = ".ORG $1234
+        let s = "; listing test
+.ORG $1234
+
 FOO     .WORD BAR
 BAR     .WORD FOO";
         let info = assemble(from_str(s, "{s}"), true).unwrap();
         assert_eq!(
             &info.listing.unwrap(),
-            "000001 0000        .ORG $1234
-000002 1234 3612   FOO     .WORD BAR
-000003 1236 3412   BAR     .WORD FOO\n"
+            "LINENO PC   BYTES  LINE
+000001 0000        ; listing test
+000002 0000        .ORG $1234
+000003 1234
+000004 1234 3612   FOO     .WORD BAR
+000005 1236 3412   BAR     .WORD FOO\n"
         );
     }
 }
