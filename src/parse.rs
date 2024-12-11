@@ -38,6 +38,7 @@ impl ParsedLine {
 }
 
 /// Allows searching through individual characters in a line.
+#[derive(Clone)]
 pub struct LineChars<'a> {
     line: &'a Rc<Line>,
     chars: Enumerate<Chars<'a>>,
@@ -74,9 +75,13 @@ impl Iterator for LineChars<'_> {
 impl Assembler {
     /// Parse a single line of input. Return the label (if any), opcode/pseudo-op (if any), and comment (if any).
     pub fn parse_line(&mut self, line: Rc<Line>) -> Result<ParsedLine, String> {
-        let mut chars = LineChars::new(&line).better_peekable();
+        let og_chars = LineChars::new(&line);
+        let mut chars = og_chars.clone().better_peekable();
 
         let label = self.parse_label(&mut chars)?;
+        if label.is_none() {
+            chars = og_chars.better_peekable();
+        }
         let action = self.parse_action(&mut chars)?;
         let comment = self.parse_comment(&mut chars)?;
 
@@ -235,6 +240,7 @@ impl Assembler {
         chars: &mut BPeekable<LineChars>,
     ) -> Result<(AMode, Option<Box<ExprNode>>), String> {
         self.skip_ws(chars);
+
         let head = {
             if let Some((_, slice)) = chars.peek() {
                 slice.clone()
@@ -242,6 +248,22 @@ impl Assembler {
                 Rc::new(LineSlice::new(self.cur_line.clone().unwrap(), 0, 0))
             }
         };
+
+        match chars.peek() {
+            Some(('a', _)) | Some(('A', _)) => {
+                if let Some((c, _)) = chars.peek_n(1) {
+                    if c.is_whitespace() || *c == ';' {
+                        chars.next().unwrap();
+                        return Ok((AMode::Imp, None));
+                    }
+                } else {
+                    chars.next().unwrap();
+                    return Ok((AMode::Imp, None));
+                }
+            }
+            _ => (),
+        }
+
         if let Some((c, _)) = chars.peek() {
             match c {
                 '#' => {
@@ -361,6 +383,7 @@ mod tests {
 
     use crate::{
         asm::Assembler,
+        assemble_str,
         parse::LineChars,
         source::{self, Line, LineSlice},
     };
@@ -397,5 +420,14 @@ mod tests {
             asm.parse_name(&mut LineChars::new(&foobar).better_peekable()),
             Some(Rc::new(LineSlice::new(foobar, 0, 6)))
         );
+    }
+
+    #[test]
+    fn test_amode() {
+        let src = "lsr a
+        ROR A;foo bar
+        asl a\t";
+        let data = assemble_str(src, "{src}").unwrap();
+        assert_eq!(data, vec![0x4A, 0x6A, 0x0A]);
     }
 }
