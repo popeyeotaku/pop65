@@ -1,10 +1,8 @@
 //! Assembly parsing.
 
-use std::{
-    iter::{Enumerate, Peekable},
-    rc::Rc,
-    str::Chars,
-};
+use std::{iter::Enumerate, rc::Rc, str::Chars};
+
+use better_peekable::{BPeekable, BetterPeekable};
 
 use crate::{
     action::Action,
@@ -76,7 +74,7 @@ impl Iterator for LineChars<'_> {
 impl Assembler {
     /// Parse a single line of input. Return the label (if any), opcode/pseudo-op (if any), and comment (if any).
     pub fn parse_line(&mut self, line: Rc<Line>) -> Result<ParsedLine, String> {
-        let mut chars = LineChars::new(&line).peekable();
+        let mut chars = LineChars::new(&line).better_peekable();
 
         let label = self.parse_label(&mut chars)?;
         let action = self.parse_action(&mut chars)?;
@@ -96,7 +94,7 @@ impl Assembler {
     }
 
     /// Skip leading whitespace.
-    pub fn skip_ws(&mut self, chars: &mut Peekable<LineChars>) {
+    pub fn skip_ws(&mut self, chars: &mut BPeekable<LineChars>) {
         while let Some((c, _)) = chars.peek() {
             if !c.is_ascii_whitespace() {
                 break;
@@ -109,7 +107,7 @@ impl Assembler {
     /// Parse the leading line label, if any.
     fn parse_label(
         &mut self,
-        chars: &mut Peekable<LineChars>,
+        chars: &mut BPeekable<LineChars>,
     ) -> Result<Option<Rc<LineSlice>>, String> {
         if let Some(name) = self.parse_name(chars) {
             if let Some((c, _)) = chars.peek() {
@@ -129,7 +127,7 @@ impl Assembler {
     }
 
     /// Grab a leading Name, if any.
-    fn parse_name(&mut self, chars: &mut Peekable<LineChars>) -> Option<Rc<LineSlice>> {
+    fn parse_name(&mut self, chars: &mut BPeekable<LineChars>) -> Option<Rc<LineSlice>> {
         if let Some((c, start)) = chars.peek().cloned() {
             if c.is_ascii_alphabetic() {
                 chars.next();
@@ -153,7 +151,7 @@ impl Assembler {
     /// Parse an action, if any.
     fn parse_action(
         &mut self,
-        chars: &mut Peekable<LineChars>,
+        chars: &mut BPeekable<LineChars>,
     ) -> Result<Option<Box<dyn Action>>, String> {
         self.skip_ws(chars);
 
@@ -180,7 +178,7 @@ impl Assembler {
 
     /// Return a flag if we're at end-of-line.
     /// (skips whitespace and also exits on a comment).
-    fn at_eol(&mut self, chars: &mut Peekable<LineChars>) -> bool {
+    fn at_eol(&mut self, chars: &mut BPeekable<LineChars>) -> bool {
         self.skip_ws(chars);
         if let Some((c, _)) = chars.peek() {
             *c == ';'
@@ -193,7 +191,7 @@ impl Assembler {
     fn parse_pseudo(
         &mut self,
         start: Rc<LineSlice>,
-        chars: &mut Peekable<LineChars>,
+        chars: &mut BPeekable<LineChars>,
     ) -> Result<Box<dyn Action>, String> {
         if let Some(name) = self.parse_name(chars) {
             let name = Rc::new(start.join(&name));
@@ -220,7 +218,7 @@ impl Assembler {
     fn parse_opcode(
         &mut self,
         opcode: Rc<LineSlice>,
-        chars: &mut Peekable<LineChars>,
+        chars: &mut BPeekable<LineChars>,
     ) -> Result<Box<dyn Action>, String> {
         let op_name = opcode.text().to_ascii_lowercase();
         if let Some(op) = find_op(&op_name) {
@@ -234,7 +232,7 @@ impl Assembler {
     /// Parse an opcode operand.
     fn parse_operand(
         &mut self,
-        chars: &mut Peekable<LineChars>,
+        chars: &mut BPeekable<LineChars>,
     ) -> Result<(AMode, Option<Box<ExprNode>>), String> {
         self.skip_ws(chars);
         let head = {
@@ -334,7 +332,7 @@ impl Assembler {
     /// Parse the trailing comment, if any.
     fn parse_comment(
         &mut self,
-        chars: &mut Peekable<LineChars>,
+        chars: &mut BPeekable<LineChars>,
     ) -> Result<Option<Rc<LineSlice>>, String> {
         self.skip_ws(chars);
         if let Some((c, start)) = chars.peek().cloned() {
@@ -359,6 +357,8 @@ mod expr;
 mod tests {
     use std::rc::Rc;
 
+    use better_peekable::BetterPeekable;
+
     use crate::{
         asm::Assembler,
         parse::LineChars,
@@ -375,10 +375,10 @@ mod tests {
         let mut asm = Assembler::new(test, false);
 
         assert_eq!(
-            asm.parse_name(&mut LineChars::new(&foo).peekable()),
+            asm.parse_name(&mut LineChars::new(&foo).better_peekable()),
             Some(Rc::new(LineSlice::new(foo.clone(), 0, 3)))
         );
-        let mut bar_chars = LineChars::new(&bar).peekable();
+        let mut bar_chars = LineChars::new(&bar).better_peekable();
         assert_eq!(
             asm.parse_name(&mut bar_chars),
             Some(Rc::new(LineSlice::new(bar.clone(), 0, 3)))
@@ -389,9 +389,12 @@ mod tests {
             asm.parse_name(&mut bar_chars),
             Some(Rc::new(LineSlice::new(bar.clone(), 4, 4 + 6)))
         );
-        assert_eq!(asm.parse_name(&mut LineChars::new(&bl).peekable()), None);
         assert_eq!(
-            asm.parse_name(&mut LineChars::new(&foobar).peekable()),
+            asm.parse_name(&mut LineChars::new(&bl).better_peekable()),
+            None
+        );
+        assert_eq!(
+            asm.parse_name(&mut LineChars::new(&foobar).better_peekable()),
             Some(Rc::new(LineSlice::new(foobar, 0, 6)))
         );
     }

@@ -96,6 +96,8 @@ impl ExprNode {
 mod tests {
     use std::rc::Rc;
 
+    use better_peekable::BetterPeekable;
+
     use crate::{
         asm::Assembler,
         parse::LineChars,
@@ -110,7 +112,7 @@ mod tests {
         let mut asm = Assembler::new(source::from_str(text, "text"), false);
         let line = Rc::new(Line::new(text, "text", 1));
         let e = asm
-            .parse_expr(&mut LineChars::new(&line).peekable())
+            .parse_expr(&mut LineChars::new(&line).better_peekable())
             .unwrap();
         assert_eq!(e.eval(&mut asm), Ok((1 + 2) * 3 - 4));
     }

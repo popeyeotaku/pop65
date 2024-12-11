@@ -1,6 +1,8 @@
 //! Expression parsing.
 
-use std::{iter::Peekable, rc::Rc};
+use std::rc::Rc;
+
+use better_peekable::BPeekable;
 
 use crate::{
     asm::Assembler,
@@ -11,12 +13,15 @@ use super::LineChars;
 
 impl Assembler {
     /// Assemble an expression.
-    pub fn parse_expr(&mut self, chars: &mut Peekable<LineChars>) -> Result<Box<ExprNode>, String> {
+    pub fn parse_expr(
+        &mut self,
+        chars: &mut BPeekable<LineChars>,
+    ) -> Result<Box<ExprNode>, String> {
         self.parse_hilo(chars)
     }
 
     /// Parse a >/< expression.
-    fn parse_hilo(&mut self, chars: &mut Peekable<LineChars>) -> Result<Box<ExprNode>, String> {
+    fn parse_hilo(&mut self, chars: &mut BPeekable<LineChars>) -> Result<Box<ExprNode>, String> {
         self.skip_ws(chars);
         if let Some((c, start)) = chars.peek().cloned() {
             match c {
@@ -39,7 +44,7 @@ impl Assembler {
     }
 
     /// Parse a relational expression.
-    fn parse_relop(&mut self, chars: &mut Peekable<LineChars>) -> Result<Box<ExprNode>, String> {
+    fn parse_relop(&mut self, chars: &mut BPeekable<LineChars>) -> Result<Box<ExprNode>, String> {
         let mut e = self.parse_addsub(chars)?;
 
         self.skip_ws(chars);
@@ -87,7 +92,7 @@ impl Assembler {
     }
 
     /// Parse a '+'/'-' expression.
-    fn parse_addsub(&mut self, chars: &mut Peekable<LineChars>) -> Result<Box<ExprNode>, String> {
+    fn parse_addsub(&mut self, chars: &mut BPeekable<LineChars>) -> Result<Box<ExprNode>, String> {
         let mut e = self.parse_muldiv(chars)?;
 
         self.skip_ws(chars);
@@ -114,7 +119,7 @@ impl Assembler {
     }
 
     /// Parse a '*'/'/'/'%' expression.
-    fn parse_muldiv(&mut self, chars: &mut Peekable<LineChars>) -> Result<Box<ExprNode>, String> {
+    fn parse_muldiv(&mut self, chars: &mut BPeekable<LineChars>) -> Result<Box<ExprNode>, String> {
         let mut e = self.parse_unary(chars)?;
         self.skip_ws(chars);
         while let Some((c, _)) = chars.peek() {
@@ -147,7 +152,7 @@ impl Assembler {
     }
 
     /// Parse a unary expression.
-    fn parse_unary(&mut self, chars: &mut Peekable<LineChars>) -> Result<Box<ExprNode>, String> {
+    fn parse_unary(&mut self, chars: &mut BPeekable<LineChars>) -> Result<Box<ExprNode>, String> {
         self.skip_ws(chars);
         if let Some((c, start)) = chars.peek().cloned() {
             if c == '-' {
@@ -163,7 +168,7 @@ impl Assembler {
     /// Parse a primary expression.
     pub fn parse_primary(
         &mut self,
-        chars: &mut Peekable<LineChars>,
+        chars: &mut BPeekable<LineChars>,
     ) -> Result<Box<ExprNode>, String> {
         self.skip_ws(chars);
         if let Some((c, start)) = chars.peek().cloned() {
@@ -213,7 +218,7 @@ impl Assembler {
     fn parse_num(
         &mut self,
         base: u8,
-        chars: &mut Peekable<LineChars>,
+        chars: &mut BPeekable<LineChars>,
     ) -> Result<Box<ExprNode>, String> {
         let (c, start) = chars.peek().unwrap();
         let mut i: u16 = c.to_digit(base as u32).unwrap() as u16;
@@ -232,7 +237,7 @@ impl Assembler {
     }
 
     /// Parse a string.
-    fn parse_str(&mut self, chars: &mut Peekable<LineChars>) -> Result<Box<ExprNode>, String> {
+    fn parse_str(&mut self, chars: &mut BPeekable<LineChars>) -> Result<Box<ExprNode>, String> {
         let (quote, start) = chars.next().unwrap();
         let mut s = String::new();
         for (c, end) in chars.by_ref() {

@@ -1,9 +1,10 @@
 [package]
 name = "pop65"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 
 [dependencies]
+better_peekable = "0.2.*"
 clap = { version = "4.5.*", features = ["derive", "wrap_help"] }
 
 [dev-dependencies]
