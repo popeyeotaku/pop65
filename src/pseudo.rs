@@ -161,6 +161,7 @@ impl Action for PseudoOp {
 
     fn pass2(&self, assembler: &mut Assembler) -> Result<Vec<u8>, String> {
         match self.op_name_lcase.as_str() {
+            ".mac" | ".mend" => self.line_slice().err("bad macro"),
             ".if" | ".else" | ".endif" => {
                 // statements skipped by these should already have been deleted, so do nothing.
                 Ok(vec![])
@@ -246,6 +247,16 @@ impl Action for PseudoOp {
 
     fn is_if_affiliated(&self) -> bool {
         matches!(self.op_name_lcase.as_str(), ".else" | ".endif")
+    }
+
+    fn is_macro_def(&self) -> Option<String> {
+        if self.op_name_lcase.as_str() == ".mac" && self.args.len() == 1 {
+            let arg = &self.args[0];
+            if arg.label == ExLab::Name {
+                return Some(arg.slice.text().to_string());
+            }
+        }
+        None
     }
 }
 

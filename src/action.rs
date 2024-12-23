@@ -24,4 +24,9 @@ pub trait Action {
     fn is_if_affiliated(&self) -> bool {
         false
     }
+
+    /// If this is the start of a new macro, return the name of the macro.
+    fn is_macro_def(&self) -> Option<String> {
+        None
+    }
 }

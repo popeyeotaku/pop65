@@ -62,6 +62,7 @@ pub fn assemble(src: Source, listing: bool) -> Result<AsmInfo, String> {
 mod action;
 mod asm;
 mod expr;
+mod mac;
 mod opcode;
 mod parse;
 mod pseudo;
