@@ -100,7 +100,11 @@ impl MacUsage {
         for (i, arg) in self.args.iter().enumerate() {
             s = s.replace(&format!(r"\{}", i + 1), arg);
         }
-        Line::new(&s, &line.path, line.line_num)
+        Line::new(
+            &s,
+            &self.referenced_line.path,
+            self.referenced_line.line_num,
+        )
     }
 
     /// Get a macro source.
