@@ -76,16 +76,17 @@ impl Assembler {
 
         if let Some(listing) = self.listing.as_mut() {
             let index = self.listing_index.as_mut().unwrap();
-            if index
-                .insert((line.path.clone(), line.line_num), listing.len())
-                .is_some()
+            if let std::collections::hash_map::Entry::Vacant(e) =
+                index.entry((line.path.clone(), line.line_num))
             {
-                panic!("saw the same line from the same file twice")
+                e.insert(listing.len());
+                listing.push(format!(
+                    "{:06} {:04X}        {}",
+                    line.line_num, self.pc, line.text
+                ));
+            } else {
+                // skip listing on multiple sights, such as in macros
             }
-            listing.push(format!(
-                "{:06} {:04X}        {}",
-                line.line_num, self.pc, line.text
-            ));
         }
 
         if !*self.if_stack.last().unwrap_or(&true) {
