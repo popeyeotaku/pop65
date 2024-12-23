@@ -30,7 +30,51 @@ impl Macro {
 
 /// Return a flag for if we're at the end of a macro.
 pub fn end_macro(text: &Line) -> bool {
-    todo!()
+    let s = skip_label(text);
+    s.starts_with(".mnd")
+}
+
+fn skip_label(l: &Line) -> String {
+    let s = l.text.to_lowercase();
+    let (first, rest) = split_at_first_blank(&s);
+    if first.map(is_label).unwrap_or_default() {
+        rest.to_string()
+    } else {
+        s
+    }
+}
+
+fn is_label(s: &str) -> bool {
+    s.chars()
+        .next()
+        .map(|c| c.is_alphabetic())
+        .unwrap_or_default()
+}
+
+fn split_at_first_blank(s: &str) -> (Option<&str>, &str) {
+    let mut quote: Option<char> = None;
+    for (i, c) in s.char_indices() {
+        if let Some(q) = quote {
+            if c == q {
+                quote = None;
+            }
+        } else {
+            match c {
+                '\'' | '"' => quote = Some(c),
+                ';' => {
+                    let (l, r) = s.split_at(i);
+                    return (Some(l.trim()), r.trim());
+                }
+                _ => {
+                    if c.is_whitespace() {
+                        let (l, r) = s.split_at(i);
+                        return (Some(l.trim()), r.trim());
+                    }
+                }
+            }
+        }
+    }
+    (None, s.trim())
 }
 
 /// A macro usage.
@@ -52,7 +96,11 @@ impl MacUsage {
 
     /// Insert any macro argument replacements.
     pub fn replace_args(&self, line: Rc<Line>) -> Line {
-        todo!()
+        let mut s: String = line.text.clone();
+        for (i, arg) in self.args.iter().enumerate() {
+            s = s.replace(&format!(r"\{}", i + 1), arg);
+        }
+        Line::new(&s, &line.path, line.line_num)
     }
 
     /// Get a macro source.
@@ -140,5 +188,40 @@ impl Assembler {
             }
         }
         Ok(Box::new(MacUsage::new(mac, args, line)))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::assemble_str;
+
+    #[test]
+    fn test_macro() {
+        let msrc = r"
+        .mac inw
+            inc \1
+            .if \1 < $100
+                bne *+4
+            .else
+                bne *+5
+            .endif
+            inc \1+1
+        .endm
+        inw $02
+        inw $1234";
+        let rsrc = "
+        a=$02
+        b=$1234
+        inc a
+        bne l1
+        inc a+1
+    l1  inc b
+        bne l2
+        inc b+1
+    l2";
+        assert_eq!(
+            assemble_str(msrc, "msrc").unwrap(),
+            assemble_str(rsrc, "rsrc").unwrap()
+        );
     }
 }

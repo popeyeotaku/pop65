@@ -49,6 +49,14 @@ impl Action for PseudoOp {
         label: Option<Rc<LineSlice>>,
     ) -> Result<u16, String> {
         match self.op_name_lcase.as_str() {
+            ".mac" => self.line_slice().err("bad macro"),
+            ".endm" => {
+                if !self.args.is_empty() {
+                    self.line_slice().err("bad macro")
+                } else {
+                    Ok(0)
+                }
+            }
             ".if" => {
                 if self.args.len() == 1 {
                     let cond_val = self.args[0].eval(assembler)?;
@@ -161,7 +169,7 @@ impl Action for PseudoOp {
 
     fn pass2(&self, assembler: &mut Assembler) -> Result<Vec<u8>, String> {
         match self.op_name_lcase.as_str() {
-            ".mac" | ".mend" => self.line_slice().err("bad macro"),
+            ".mac" | ".endm" => self.line_slice().err("bad macro"),
             ".if" | ".else" | ".endif" => {
                 // statements skipped by these should already have been deleted, so do nothing.
                 Ok(vec![])
