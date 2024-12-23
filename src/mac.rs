@@ -2,8 +2,12 @@
 
 use std::rc::Rc;
 
+use better_peekable::BPeekable;
+
 use crate::{
     action::Action,
+    asm::Assembler,
+    parse::LineChars,
     source::{Line, LineSlice},
 };
 
@@ -34,11 +38,11 @@ pub fn end_macro(text: &Line) -> bool {
 pub struct MacUsage {
     mac: Rc<Macro>,
     args: Vec<String>,
-    referenced_line: Rc<LineSlice>,
+    referenced_line: Rc<Line>,
 }
 
 impl MacUsage {
-    pub fn new(mac: Rc<Macro>, args: Vec<String>, referenced_line: Rc<LineSlice>) -> Self {
+    pub fn new(mac: Rc<Macro>, args: Vec<String>, referenced_line: Rc<Line>) -> Self {
         Self {
             mac,
             args,
@@ -96,6 +100,45 @@ impl Action for MacUsage {
     }
 
     fn line_slice(&self) -> Rc<crate::source::LineSlice> {
-        self.referenced_line.clone()
+        Rc::new(LineSlice::new(
+            self.referenced_line.clone(),
+            0,
+            self.referenced_line.text.chars().count() as u16,
+        ))
+    }
+}
+
+impl Assembler {
+    fn parse_macro_arg(&mut self, chars: &mut BPeekable<LineChars>) -> String {
+        let mut s = String::new();
+        while !self.at_eol(chars) {
+            let (c, _) = chars.peek().unwrap();
+            if *c == ',' {
+                break;
+            } else {
+                s.push(*c);
+                chars.next().unwrap();
+            }
+        }
+        s.trim().to_string()
+    }
+
+    pub fn parse_macro(
+        &mut self,
+        mac: Rc<Macro>,
+        chars: &mut BPeekable<LineChars>,
+        line: Rc<Line>,
+    ) -> Result<Box<dyn Action>, String> {
+        let mut args: Vec<String> = Vec::new();
+        if !self.at_eol(chars) {
+            args.push(self.parse_macro_arg(chars));
+            while !self.at_eol(chars) {
+                let (c, _) = chars.peek().unwrap();
+                if *c != ',' {
+                    break;
+                }
+            }
+        }
+        Ok(Box::new(MacUsage::new(mac, args, line)))
     }
 }

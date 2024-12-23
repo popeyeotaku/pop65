@@ -75,6 +75,7 @@ impl Iterator for LineChars<'_> {
 impl Assembler {
     /// Parse a single line of input. Return the label (if any), opcode/pseudo-op (if any), and comment (if any).
     pub fn parse_line(&mut self, line: Rc<Line>) -> Result<ParsedLine, String> {
+        let og_line = line.clone();
         let og_chars = LineChars::new(&line);
         let mut chars = og_chars.clone().better_peekable();
 
@@ -82,7 +83,7 @@ impl Assembler {
         if label.is_none() {
             chars = og_chars.better_peekable();
         }
-        let action = self.parse_action(&mut chars)?;
+        let action = self.parse_action(&mut chars, &og_line)?;
         let comment = self.parse_comment(&mut chars)?;
 
         self.skip_ws(&mut chars);
@@ -157,6 +158,7 @@ impl Assembler {
     fn parse_action(
         &mut self,
         chars: &mut BPeekable<LineChars>,
+        line: &Rc<Line>,
     ) -> Result<Option<Box<dyn Action>>, String> {
         self.skip_ws(chars);
 
@@ -175,7 +177,11 @@ impl Assembler {
         }
 
         if let Some(name) = self.parse_name(chars) {
-            self.parse_opcode(name, chars).map(Some)
+            if let Some(mac) = self.macros.get(name.text()) {
+                self.parse_macro(mac.clone(), chars, line.clone()).map(Some)
+            } else {
+                self.parse_opcode(name, chars).map(Some)
+            }
         } else {
             Ok(None)
         }
@@ -183,7 +189,7 @@ impl Assembler {
 
     /// Return a flag if we're at end-of-line.
     /// (skips whitespace and also exits on a comment).
-    fn at_eol(&mut self, chars: &mut BPeekable<LineChars>) -> bool {
+    pub fn at_eol(&mut self, chars: &mut BPeekable<LineChars>) -> bool {
         self.skip_ws(chars);
         if let Some((c, _)) = chars.peek() {
             *c == ';'
