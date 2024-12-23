@@ -3,6 +3,7 @@
 use std::{collections::HashMap, mem, rc::Rc};
 
 use crate::{
+    mac::{end_macro, Macro},
     parse::ParsedLine,
     source::{Line, LineNum, LineSlice, Source, SrcStack},
     symbol::Symbol,
@@ -34,6 +35,7 @@ pub struct Assembler {
     pub if_stack: Vec<bool>,
     pub listing: Option<Vec<String>>,
     listing_index: Option<HashMap<(String, LineNum), usize>>,
+    pub macros: HashMap<String, Rc<Macro>>,
 }
 
 /// The initial value of the assembler's program counter.
@@ -49,6 +51,7 @@ impl Assembler {
             }
         };
         Self {
+            macros: HashMap::new(),
             src_stk: Box::new(SrcStack::new(src)),
             symtab: HashMap::new(),
             pc: DEFAULT_PC,
@@ -116,8 +119,27 @@ impl Assembler {
             }
         }
         if let Some(action) = &parsed.action {
-            let size = action.pass1(self, parsed.label.clone())?;
-            self.pc = self.pc.wrapping_add(size);
+            if let Some(name) = action.is_macro_def() {
+                let mut mac = Macro::new();
+                for line in self.src_stk.by_ref() {
+                    mac.add_line(line.clone());
+                    if end_macro(&line) {
+                        break;
+                    }
+                }
+                if let std::collections::hash_map::Entry::Vacant(e) =
+                    self.macros.entry(name.clone())
+                {
+                    e.insert(Rc::new(mac));
+                } else {
+                    action
+                        .line_slice()
+                        .err(&format!("macro {} redefined", name))?;
+                }
+            } else {
+                let size = action.pass1(self, parsed.label.clone())?;
+                self.pc = self.pc.wrapping_add(size);
+            }
         }
         if let Some(c) = comment {
             if parsed.label.is_none() && parsed.action.is_none() {

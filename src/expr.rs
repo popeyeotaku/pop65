@@ -5,6 +5,7 @@ use std::rc::Rc;
 use crate::{asm::Assembler, source::LineSlice};
 
 /// A single expression tree node.
+#[derive(PartialEq)]
 pub struct ExprNode {
     pub label: ExLab,
     pub slice: Rc<LineSlice>,
@@ -17,6 +18,7 @@ impl ExprNode {
 }
 
 /// A given type of expression tree node, along with its operands.
+#[derive(PartialEq)]
 pub enum ExLab {
     Name,
     Num(u16),
@@ -34,6 +36,7 @@ pub enum ExLab {
 }
 
 /// A relational operator.
+#[derive(PartialEq)]
 pub enum RelOp {
     Less,
     Great,
