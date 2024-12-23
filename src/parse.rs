@@ -115,17 +115,22 @@ impl Assembler {
         &mut self,
         chars: &mut BPeekable<LineChars>,
     ) -> Result<Option<Rc<LineSlice>>, String> {
+        self.skip_ws(chars);
         if let Some(name) = self.parse_name(chars) {
             if let Some((c, _)) = chars.peek() {
                 if *c == ':' {
                     chars.next();
                 }
             }
-            let opchk = name.text().to_ascii_lowercase();
-            if find_op(opchk.as_str()).is_some() {
+            if self.macros.contains_key(name.text()) {
                 Ok(None)
             } else {
-                Ok(Some(name))
+                let opchk = name.text().to_ascii_lowercase();
+                if find_op(opchk.as_str()).is_some() {
+                    Ok(None)
+                } else {
+                    Ok(Some(name))
+                }
             }
         } else {
             Ok(None)

@@ -169,7 +169,7 @@ impl Action for PseudoOp {
 
     fn pass2(&self, assembler: &mut Assembler) -> Result<Vec<u8>, String> {
         match self.op_name_lcase.as_str() {
-            ".mac" | ".endm" => self.line_slice().err("bad macro"),
+            ".mac" => Ok(Vec::new()),
             ".if" | ".else" | ".endif" => {
                 // statements skipped by these should already have been deleted, so do nothing.
                 Ok(vec![])

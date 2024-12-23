@@ -31,11 +31,11 @@ impl Macro {
 /// Return a flag for if we're at the end of a macro.
 pub fn end_macro(text: &Line) -> bool {
     let s = skip_label(text);
-    s.starts_with(".mnd")
+    s.trim().starts_with(".endm")
 }
 
 fn skip_label(l: &Line) -> String {
-    let s = l.text.to_lowercase();
+    let s = l.text.to_lowercase().trim().to_string();
     let (first, rest) = split_at_first_blank(&s);
     if first.map(is_label).unwrap_or_default() {
         rest.to_string()
@@ -135,16 +135,14 @@ impl Action for MacUsage {
         assembler: &mut crate::asm::Assembler,
         label: Option<Rc<crate::source::LineSlice>>,
     ) -> Result<u16, String> {
+        let _ = label;
         assembler.src_stk.push(Box::new(self.clone().source()));
-        if let Some(label) = label {
-            assembler.def_label(label.text(), label.clone(), None)?;
-        }
         Ok(0)
     }
 
     fn pass2(&self, assembler: &mut crate::asm::Assembler) -> Result<Vec<u8>, String> {
         let _ = assembler;
-        panic!("shouldn't ever get a macro in pass 2")
+        Ok(Vec::new())
     }
 
     fn line_slice(&self) -> Rc<crate::source::LineSlice> {
@@ -210,15 +208,15 @@ mod tests {
         inw $02
         inw $1234";
         let rsrc = "
-        a=$02
-        b=$1234
-        inc a
+        foo=$02
+        bar=$1234
+        inc foo
         bne l1
-        inc a+1
-    l1  inc b
+        inc foo+1
+    l1: inc bar
         bne l2
-        inc b+1
-    l2";
+        inc bar+1
+    l2:";
         assert_eq!(
             assemble_str(msrc, "msrc").unwrap(),
             assemble_str(rsrc, "rsrc").unwrap()
