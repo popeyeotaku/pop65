@@ -195,7 +195,7 @@ impl Assembler {
 
 #[cfg(test)]
 mod tests {
-    use crate::assemble_str;
+    use crate::{assemble, assemble_str, source::from_str};
 
     #[test]
     fn test_macro() {
@@ -225,5 +225,50 @@ mod tests {
             assemble_str(msrc, "msrc").unwrap(),
             assemble_str(rsrc, "rsrc").unwrap()
         );
+    }
+
+    #[test]
+    fn test_list_macro() {
+        let src = r"
+        .mac inw
+            inc \1
+            .if \1 < $100
+                bne *+4
+            .else
+                bne *+5
+            .endif
+            inc \1+1
+        .endm
+        inw $1234
+        inw $5678
+        ";
+        let should_be = "LINENO PC   BYTES  LINE
+000001 0000
+000002 0000                .mac inw
+000011 0000                inw $1234
+000011 0000 EE3412             inc $1234
+000011 0003                    .if $1234 < $100
+000011 0003                        bne *+4
+000011 0003                    .else
+000011 0003 D003                   bne *+5
+000011 0005                    .endif
+000011 0005 EE3512             inc $1234+1
+000011 0008                .endm
+000012 0008                inw $5678
+000012 0008 EE7856             inc $5678
+000012 000B                    .if $5678 < $100
+000012 000B                        bne *+4
+000012 000B                    .else
+000012 000B D003                   bne *+5
+000012 000D                    .endif
+000012 000D EE7956             inc $5678+1
+000012 0010                .endm
+000013 0010
+";
+        let is_be = assemble(from_str(src, "{src}"), true)
+            .unwrap()
+            .listing
+            .unwrap();
+        assert_eq!(should_be, &is_be);
     }
 }
