@@ -5,7 +5,7 @@ use std::{collections::HashMap, mem, rc::Rc};
 use crate::{
     mac::{end_macro, Macro},
     parse::ParsedLine,
-    source::{Line, LineNum, LineSlice, Source, SrcStack},
+    source::{Line, LineSlice, Source, SrcStack},
     symbol::Symbol,
 };
 
@@ -34,7 +34,7 @@ pub struct Assembler {
     pub output_flag: bool,
     pub if_stack: Vec<bool>,
     pub listing: Option<Vec<String>>,
-    listing_index: Option<HashMap<(String, LineNum), usize>>,
+    listing_index: Option<Vec<usize>>,
     pub macros: HashMap<String, Rc<Macro>>,
 }
 
@@ -45,7 +45,7 @@ impl Assembler {
     pub fn new(src: Source, list_file: bool) -> Self {
         let (listing, listing_index) = {
             if list_file {
-                (Some(Vec::new()), Some(HashMap::new()))
+                (Some(Vec::new()), Some(Vec::new()))
             } else {
                 (None, None)
             }
@@ -75,18 +75,10 @@ impl Assembler {
         let parsed = self.parse_line(line.clone())?;
 
         if let Some(listing) = self.listing.as_mut() {
-            let index = self.listing_index.as_mut().unwrap();
-            if let std::collections::hash_map::Entry::Vacant(e) =
-                index.entry((line.path.clone(), line.line_num))
-            {
-                e.insert(listing.len());
-                listing.push(format!(
-                    "{:06} {:04X}        {}",
-                    line.line_num, self.pc, line.text
-                ));
-            } else {
-                // skip listing on multiple sights, such as in macros
-            }
+            listing.push(format!(
+                "{:06} {:04X}        {}",
+                line.line_num, self.pc, line.text
+            ));
         }
 
         if !*self.if_stack.last().unwrap_or(&true) {
@@ -154,6 +146,9 @@ impl Assembler {
             self.building_comment = None;
         }
 
+        if let Some(index) = self.listing_index.as_mut() {
+            index.push(self.listing.as_ref().unwrap().len() - 1);
+        }
         self.parsed_lines.push(parsed);
 
         Ok(())
@@ -187,14 +182,18 @@ impl Assembler {
     }
 
     /// Handle a single line in pass2.
-    fn pass2_line(&mut self, line: &ParsedLine, output: &mut Vec<u8>) -> Result<(), String> {
+    fn pass2_line(
+        &mut self,
+        line_vec_index: usize,
+        line: &ParsedLine,
+        output: &mut Vec<u8>,
+    ) -> Result<(), String> {
         let old_pc = self.pc;
         if let Some(action) = &line.action {
             let new_bytes = action.pass2(self)?;
             self.pc = self.pc.wrapping_add(new_bytes.len() as u16);
             if let Some(listing) = self.listing.as_mut() {
-                let index = self.listing_index.as_mut().unwrap();
-                let i = index[&(line.line.path.clone(), line.line.line_num)];
+                let i = self.listing_index.as_ref().unwrap()[line_vec_index];
                 let mut l = String::new();
                 l.push_str(&format!("{:06} {:04X} ", line.line.line_num, old_pc));
                 for i in 0..BYTES_PER_LINE {
@@ -222,8 +221,8 @@ impl Assembler {
         let mut output: Vec<u8> = Vec::with_capacity((u16::MAX as usize) + 1);
         let lines = mem::take(&mut self.parsed_lines);
 
-        for parsed_line in &lines {
-            if let Err(msg) = self.pass2_line(parsed_line, &mut output) {
+        for (i, parsed_line) in lines.iter().enumerate() {
+            if let Err(msg) = self.pass2_line(i, parsed_line, &mut output) {
                 eprintln!("{}", msg);
                 self.errcount += 1;
             }
