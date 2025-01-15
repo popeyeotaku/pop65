@@ -221,7 +221,17 @@ impl Assembler {
         chars: &mut BPeekable<LineChars>,
     ) -> Result<Box<ExprNode>, String> {
         let (c, start) = chars.peek().unwrap();
-        let mut i: u16 = c.to_digit(base as u32).unwrap() as u16;
+        let mut i = {
+            if let Some(i) = c.to_digit(base as u32) {
+                i as u16
+            } else {
+                return self
+                    .cur_line
+                    .as_ref()
+                    .unwrap()
+                    .err(&format!("'{}' isn't a digit in base {}", c, base));
+            }
+        };
         let mut slice = start.clone();
         chars.next();
         while let Some((c, end)) = chars.peek() {
