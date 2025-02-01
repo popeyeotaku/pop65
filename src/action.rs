@@ -29,4 +29,10 @@ pub trait Action {
     fn is_macro_def(&self) -> Option<String> {
         None
     }
+
+    /// If this is an equ macro, try to evaluate it.
+    fn eval_equ(&self, assembler: &mut Assembler) -> Option<u16> {
+        let _ = assembler;
+        None
+    }
 }

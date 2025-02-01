@@ -266,6 +266,14 @@ impl Action for PseudoOp {
         }
         None
     }
+
+    fn eval_equ(&self, assembler: &mut Assembler) -> Option<u16> {
+        if self.is_equ() {
+            self.args.first()?.eval(assembler).ok()
+        } else {
+            None
+        }
+    }
 }
 
 #[cfg(test)]

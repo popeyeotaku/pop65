@@ -1,6 +1,10 @@
 //! Assembler struct stuff.
 
-use std::{collections::HashMap, mem, rc::Rc};
+use std::{
+    collections::{hash_map, HashMap},
+    mem,
+    rc::Rc,
+};
 
 use crate::{
     mac::{end_macro, Macro},
@@ -74,10 +78,26 @@ impl Assembler {
         self.cur_line = Some(line.clone());
         let parsed = self.parse_line(line.clone())?;
 
+        let is_equ = {
+            if let Some(action) = &parsed.action {
+                action.is_equ()
+            } else {
+                false
+            }
+        };
+        let listing_pc = {
+            let pc = self.pc;
+            if is_equ {
+                parsed.action.as_ref().unwrap().eval_equ(self).unwrap_or(pc)
+            } else {
+                pc
+            }
+        };
+
         if let Some(listing) = self.listing.as_mut() {
             listing.push(format!(
                 "{:06} {:04X}        {}",
-                line.line_num, self.pc, line.text
+                line.line_num, listing_pc, line.text
             ));
         }
 
@@ -92,13 +112,6 @@ impl Assembler {
         }
 
         let comment = parsed.filter_comment();
-        let is_equ = {
-            if let Some(action) = &parsed.action {
-                action.is_equ()
-            } else {
-                false
-            }
-        };
         if let Some(label_slice) = &parsed.label {
             let comment_label = {
                 if let Some(s) = self.building_comment.take() {
@@ -120,9 +133,7 @@ impl Assembler {
                         break;
                     }
                 }
-                if let std::collections::hash_map::Entry::Vacant(e) =
-                    self.macros.entry(name.clone())
-                {
+                if let hash_map::Entry::Vacant(e) = self.macros.entry(name.clone()) {
                     e.insert(Rc::new(mac));
                 } else {
                     action
@@ -188,14 +199,15 @@ impl Assembler {
         line: &ParsedLine,
         output: &mut Vec<u8>,
     ) -> Result<(), String> {
-        let old_pc = self.pc;
         if let Some(action) = &line.action {
+            let listing_pc = action.eval_equ(self).unwrap_or(self.pc);
+
             let new_bytes = action.pass2(self)?;
             self.pc = self.pc.wrapping_add(new_bytes.len() as u16);
             if let Some(listing) = self.listing.as_mut() {
                 let i = self.listing_index.as_ref().unwrap()[line_vec_index];
                 let mut l = String::new();
-                l.push_str(&format!("{:06} {:04X} ", line.line.line_num, old_pc));
+                l.push_str(&format!("{:06} {:04X} ", line.line.line_num, listing_pc));
                 for i in 0..BYTES_PER_LINE {
                     if let Some(b) = new_bytes.get(i) {
                         l.push_str(&format!("{:02X}", *b));
@@ -494,5 +506,22 @@ BAR     .WORD FOO";
 000004 1234 3612   FOO     .WORD BAR
 000005 1236 3412   BAR     .WORD FOO\n"
         );
+    }
+
+    #[test]
+    fn test_equ_lst() {
+        let src = "
+        .org $1234
+FOO     .word FOO
+BAR     = $5678";
+        let info = assemble(from_str(src, "{s}"), true).unwrap();
+        assert_eq!(
+            &info.listing.unwrap(),
+            "LINENO PC   BYTES  LINE
+000001 0000
+000002 0000                .org $1234
+000003 1234 3412   FOO     .word FOO
+000004 5678        BAR     = $5678\n"
+        )
     }
 }
