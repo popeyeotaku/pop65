@@ -7,7 +7,7 @@ use better_peekable::BPeekable;
 use crate::{
     action::Action,
     asm::Assembler,
-    parse::LineChars,
+    parse::{is_alpha, LineChars},
     source::{Line, LineSlice},
 };
 
@@ -45,10 +45,7 @@ fn skip_label(l: &Line) -> String {
 }
 
 fn is_label(s: &str) -> bool {
-    s.chars()
-        .next()
-        .map(|c| c.is_alphabetic())
-        .unwrap_or_default()
+    s.chars().next().map(is_alpha).unwrap_or_default()
 }
 
 fn split_at_first_blank(s: &str) -> (Option<&str>, &str) {

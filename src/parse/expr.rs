@@ -9,7 +9,7 @@ use crate::{
     expr::{ExLab, ExprNode, RelOp},
 };
 
-use super::LineChars;
+use super::{is_alpha, LineChars};
 
 impl Assembler {
     /// Assemble an expression.
@@ -193,7 +193,7 @@ impl Assembler {
             } else if c == '@' {
                 chars.next();
                 self.parse_num(8, chars)
-            } else if c.is_ascii_alphabetic() {
+            } else if is_alpha(c) {
                 let name = self.parse_name(chars).unwrap();
                 // Ensure this reference to the symbol is noticed
                 self.lookup(name.text(), name.clone());

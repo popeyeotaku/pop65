@@ -532,6 +532,6 @@ BAR     = $5678";
         foo: .word foo_bar
         bar: .word foo_bar";
         let bytes = assemble_str(src, "src").unwrap();
-        assert_eq!(bytes, vec![0x02, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00]);
+        assert_eq!(bytes, vec![0x04, 0x00, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00]);
     }
 }

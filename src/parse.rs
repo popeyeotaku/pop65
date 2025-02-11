@@ -140,11 +140,11 @@ impl Assembler {
     /// Grab a leading Name, if any.
     fn parse_name(&mut self, chars: &mut BPeekable<LineChars>) -> Option<Rc<LineSlice>> {
         if let Some((c, start)) = chars.peek().cloned() {
-            if c.is_ascii_alphabetic() {
+            if is_alpha(c) {
                 chars.next();
                 let mut end = start.end_char;
                 while let Some((c, new_end)) = chars.peek() {
-                    if !c.is_ascii_alphanumeric() {
+                    if !is_alphanum(*c) {
                         break;
                     }
                     end = new_end.end_char;
@@ -385,6 +385,18 @@ impl Assembler {
 }
 
 mod expr;
+
+/// Return a flag if the character counts as alphabetic.
+#[inline]
+pub fn is_alpha(c: char) -> bool {
+    c.is_ascii_alphabetic() || c == '_'
+}
+
+/// Return a flag if the character counts as alphabetic or numeric.
+#[inline]
+fn is_alphanum(c: char) -> bool {
+    c.is_ascii_alphanumeric() || c == '_'
+}
 
 #[cfg(test)]
 mod tests {
