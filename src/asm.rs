@@ -524,4 +524,14 @@ BAR     = $5678";
 000004 5678        BAR     = $5678\n"
         )
     }
+
+    #[test]
+    fn test_underscore() {
+        use crate::assemble_str;
+        let src = "foo_bar .word foo,bar
+        foo: .word foo_bar
+        bar: .word foo_bar";
+        let bytes = assemble_str(src, "src").unwrap();
+        assert_eq!(bytes, vec![0x02, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00]);
+    }
 }
