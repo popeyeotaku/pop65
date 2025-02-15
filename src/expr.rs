@@ -33,6 +33,8 @@ pub enum ExLab {
     Expr(Box<ExprNode>),
     Str(String),
     RelOp(RelOp, Box<ExprNode>, Box<ExprNode>),
+    And(Box<ExprNode>, Box<ExprNode>),
+    Or(Box<ExprNode>, Box<ExprNode>),
 }
 
 /// A relational operator.
@@ -91,6 +93,8 @@ impl ExprNode {
                     Ok(0)
                 }
             }
+            ExLab::And(left, right) => Ok(left.eval(asm)? & right.eval(asm)?),
+            ExLab::Or(left, right) => Ok(left.eval(asm)? | right.eval(asm)?),
         }
     }
 }

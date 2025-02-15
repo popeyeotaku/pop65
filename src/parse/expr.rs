@@ -45,7 +45,7 @@ impl Assembler {
 
     /// Parse a relational expression.
     fn parse_relop(&mut self, chars: &mut BPeekable<LineChars>) -> Result<Box<ExprNode>, String> {
-        let mut e = self.parse_addsub(chars)?;
+        let mut e = self.parse_andor(chars)?;
 
         self.skip_ws(chars);
         while let Some((c, start)) = chars.peek().cloned() {
@@ -88,6 +88,33 @@ impl Assembler {
             e = ExprNode::new(ExLab::RelOp(op, e, right), slice);
         }
 
+        Ok(e)
+    }
+
+    /// Parse a '&'/'|' expression.
+    fn parse_andor(&mut self, chars: &mut BPeekable<LineChars>) -> Result<Box<ExprNode>, String> {
+        let mut e = self.parse_addsub(chars)?;
+
+        self.skip_ws(chars);
+        while let Some((c, _)) = chars.peek() {
+            match c {
+                '&' => {
+                    chars.next();
+                    let right = self.parse_addsub(chars)?;
+                    let slice = Rc::new(e.slice.join(&right.slice));
+                    e = ExprNode::new(ExLab::And(e, right), slice);
+                    self.skip_ws(chars);
+                }
+                '|' => {
+                    chars.next();
+                    let right = self.parse_addsub(chars)?;
+                    let slice = Rc::new(e.slice.join(&right.slice));
+                    e = ExprNode::new(ExLab::Or(e, right), slice);
+                    self.skip_ws(chars);
+                }
+                _ => break,
+            }
+        }
         Ok(e)
     }
 

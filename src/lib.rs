@@ -181,4 +181,14 @@ foobar  .word *     ; foobar's comment
             Some("foobar's comment".to_string())
         )
     }
+
+    #[test]
+    fn test_paren() {
+        let src = ".BYTE     MIRROR+(BATTERY*2)+((MAPPER&$F)*$10)
+MIRROR = 1
+BATTERY = 1
+MAPPER  = $A";
+        let bytes = assemble_str(src, "src").unwrap();
+        assert_eq!(bytes, vec![0xA3]);
+    }
 }
